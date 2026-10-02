@@ -86,20 +86,32 @@ pub fn concept_key_from_tags(tags: &[String], fallback_item_id: &str) -> Option<
 
 /// A2a: SM-2 的 quality(0..=5) 折合为 FSRS 语义的 rating(1..=4)。
 ///
-/// 折档依据 SM-2 原始定义：
-/// - `quality < 3` 判为复习失败（EF 下调、repetitions 归零），故 0/1 → Again(1)
-/// - `quality == 2` 属于「想起来但严重困难」，是失败区上沿 → Hard(2)
-/// - `quality == 3` 是「正确但有困难」的下界 → Good(3)
-/// - `quality >= 4` 为「轻松 / 完美」 → Easy(4)
+/// **折档必须与 SM-2 侧的通过语义对齐**，否则同一条复习记录会自相矛盾：
+/// 本仓库 `spaced_repetition.rs:45` 定义 `PASSING_GRADE = 3`，且
+/// `ReviewQuality::is_passing()`（`:93`）为 `>= 3`。即
+///
+/// ```text
+/// 0  Blackout          完全不记得          失败
+/// 1  WrongButFamiliar  答错但有印象        失败
+/// 2  WrongButEasy      答错但感觉好记      失败   ← 关键：不是 Hard
+/// 3  Difficult         答对但很勉强        ★通过线
+/// 4  Good              较流畅
+/// 5  Perfect           完美
+/// ```
+///
+/// 因此 0/1/2 三档**全部**归入 `Again(1)`（signal = 0.0，掌握度下降），
+/// 而不是把 2 误记为 `Hard(2)`——后者 signal = 0.3 会让一次答错反而**抬高**
+/// 掌握度，与 `calculate_next_review`（`:151` 走 `quality < PASSING_GRADE`
+/// 失败分支）的判定直接冲突。
 ///
 /// 越界 quality 返回 `None`，由调用方转成校验错误（与 FSRS 侧的
 /// `1..=4` 越界处理保持同构）。
 pub fn sm2_quality_to_rating(quality: u8) -> Option<u8> {
     match quality {
-        0 | 1 => Some(1), // Again
-        2 => Some(2),     // Hard
-        3 => Some(3),     // Good
-        4 | 5 => Some(4), // Easy
+        0..=2 => Some(1), // Blackout / WrongButFamiliar / WrongButEasy — 均为失败
+        3 => Some(2),     // Difficult（勉强通过）→ Hard
+        4 => Some(3),     // Good → Good
+        5 => Some(4),     // Perfect → Easy
         _ => None,
     }
 }
@@ -272,7 +284,17 @@ impl MasteryService {
             Some(rating) => MasteryOutcome::Rating(rating),
             None => return Err(AppError::validation("SM-2 quality must be 0..=5")),
         };
-        let event_id = format!("me_sm2_{}", review_history_id.trim());
+        // 空 history id 会让事件 id 坍缩成 "me_sm2_"，ON CONFLICT DO NOTHING
+        // 会把不同复习记录静默合并成一条。同文件 record_qbank_verdict_correction_with_conn
+        // 已有同型守卫，此处保持一致。生产不可达（history.id 形如 rh_{nanoid(10)}），
+        // 但静默吞数据比显式报错更糟。
+        let history_id = review_history_id.trim();
+        if history_id.is_empty() {
+            return Err(AppError::validation(
+                "SM-2 review history id must be non-empty",
+            ));
+        }
+        let event_id = format!("me_sm2_{}", history_id);
         let mut conn = self
             .vfs_db
             .get_conn_safe()
@@ -1855,16 +1877,56 @@ mod tests {
 
     #[test]
     fn sm2_quality_mapping_covers_full_domain_and_rejects_out_of_range() {
-        // 0-1 → Again；2 → Hard；3 → Good；4-5 → Easy
+        // 0-2 均为失败档（Blackout / WrongButFamiliar / WrongButEasy）→ Again
         assert_eq!(sm2_quality_to_rating(0), Some(1));
         assert_eq!(sm2_quality_to_rating(1), Some(1));
-        assert_eq!(sm2_quality_to_rating(2), Some(2));
-        assert_eq!(sm2_quality_to_rating(3), Some(3));
-        assert_eq!(sm2_quality_to_rating(4), Some(4));
+        assert_eq!(sm2_quality_to_rating(2), Some(1));
+        // 3 是 PASSING_GRADE，勉强通过 → Hard
+        assert_eq!(sm2_quality_to_rating(3), Some(2));
+        // 4 → Good，5 → Easy
+        assert_eq!(sm2_quality_to_rating(4), Some(3));
         assert_eq!(sm2_quality_to_rating(5), Some(4));
         // 越界必须显式失败，不得静默折中
         assert_eq!(sm2_quality_to_rating(6), None);
         assert_eq!(sm2_quality_to_rating(255), None);
+    }
+
+    /// 回归锁：折档必须与 SM-2 的通过线一致。
+    ///
+    /// 若这两者脱钩，同一条复习记录会在 review_plans 里记为「失败」
+    /// 却在 mastery_states 里抬高掌握度（A2a 早期版本的实际缺陷）。
+    #[test]
+    fn sm2_mapping_agrees_with_sm2_passing_grade() {
+        use crate::spaced_repetition::{ReviewQuality, PASSING_GRADE};
+
+        for q in 0u8..=5 {
+            let passing = q >= PASSING_GRADE;
+            let signal = sm2_quality_to_rating(q)
+                .map(|r| MasteryOutcome::Rating(r).target_signal())
+                .expect("quality 0..=5 必须可映射");
+
+            if passing {
+                assert!(
+                    signal >= 0.5,
+                    "quality={q} 在 SM-2 侧判通过，掌握度信号却只有 {signal}（应 >= 0.5）"
+                );
+            } else {
+                assert!(
+                    signal < 0.5,
+                    "quality={q} 在 SM-2 侧判失败（PASSING_GRADE={PASSING_GRADE}），\
+                     掌握度信号却是 {signal}（应 < 0.5）——映射与通过线脱钩"
+                );
+            }
+
+            // 顺带钉住 ReviewQuality 的语义，防止上游改动后本测试静默失效
+            if let Some(rq) = ReviewQuality::from_u8(q) {
+                assert_eq!(
+                    rq.is_passing(),
+                    passing,
+                    "ReviewQuality::{rq:?}.is_passing() 与 q >= PASSING_GRADE 不一致"
+                );
+            }
+        }
     }
 
     #[test]
@@ -1872,7 +1934,8 @@ mod tests {
         let (_tmp, vfs, svc) = setup();
         let qid = seed_question(&vfs, "SM2概念");
 
-        svc.record_sm2_review_rating_for_log("rh_test0001", &qid, &["SM2概念".into()], 4)
+        // quality=5 (Perfect) → Rating(4) → signal 1.0
+        svc.record_sm2_review_rating_for_log("rh_test0001", &qid, &["SM2概念".into()], 5)
             .unwrap()
             .expect("state emitted");
 
@@ -1887,7 +1950,22 @@ mod tests {
 
         assert_eq!(source, "sm2", "A2a 事件必须以 sm2 源落库");
         assert_eq!(outcome, "rating", "SM-2 评分应落为 rating outcome");
-        assert!((signal - 1.0).abs() < 1e-9, "quality=4 → Easy → signal 1.0");
+        assert!((signal - 1.0).abs() < 1e-9, "quality=5 → Perfect → signal 1.0");
+    }
+
+    #[test]
+    fn sm2_review_rejects_empty_history_id() {
+        let (_tmp, _vfs, svc) = setup();
+        // 空 id 会让事件 id 坍缩成 "me_sm2_"，不同复习记录被静默合并
+        for bad in ["", "   "] {
+            let err = svc
+                .record_sm2_review_rating_for_log(bad, "q1", &["某概念".into()], 3)
+                .unwrap_err();
+            assert!(
+                format!("{err}").contains("history id"),
+                "空/空白 history id 应显式报错，实际: {err}"
+            );
+        }
     }
 
     #[test]
@@ -1915,11 +1993,23 @@ mod tests {
     #[test]
     fn sm2_review_skips_without_usable_concept_key() {
         let (_tmp, _vfs, svc) = setup();
-        // 空 question_id 且无 tags → concept_key_from_tags 返回 None
-        let result = svc
-            .record_sm2_review_rating_for_log("rh_noconcept", "", &[], 3)
+        // 实现用 concept_key_from_tags(tags, "")，第二参硬编码空串——
+        // question_id 不参与判定。两种输入都要覆盖，否则误把第二参改成
+        // question_id 时此测试仍会通过（review_plan 侧正是传 question_id 的约定）。
+        for (qid, label) in [("", "空 question_id + 空 tags"), ("q1", "非空 question_id + 空 tags")] {
+            let result = svc
+                .record_sm2_review_rating_for_log("rh_noconcept", qid, &[], 3)
+                .unwrap_or_else(|e| panic!("{label} 应静默跳过而非报错: {e}"));
+            assert!(
+                result.is_none(),
+                "{label}：无 tags 时必须返回 None（concept_key 不可用）"
+            );
+        }
+        // 只有空白字符的 tag 同样不可用
+        let blank = svc
+            .record_sm2_review_rating_for_log("rh_blank", "q1", &["   ".into()], 3)
             .unwrap();
-        assert!(result.is_none(), "无 concept_key 应静默跳过而非报错");
+        assert!(blank.is_none(), "纯空白 tag 不应被当作可用 concept_key");
     }
 
     #[test]
@@ -1939,7 +2029,7 @@ mod tests {
         let (_tmp, _vfs, svc) = setup();
         let qid = seed_question(&_vfs, "薄弱概念");
 
-        // 连续三次低分（quality=0/1 → Again → signal 0.0）
+        // 连续三次低分（quality=1 → WrongButFamiliar → Again → signal 0.0）
         for i in 0..3 {
             svc.record_sm2_review_rating_for_log(
                 &format!("rh_weak{i}"),
@@ -1955,5 +2045,17 @@ mod tests {
             weak.iter().any(|s| s.concept_key == "薄弱概念"),
             "SM-2 连续低分应使概念进入薄弱列表（证明回流真的参与聚合）"
         );
+
+        // 断言事件确实来自 sm2 源——weak_concepts 的 SQL 本身不含 source 列，
+        // 只验证列表命中无法证明「SM-2 回流」这一新行为。
+        let conn = _vfs.get_conn_safe().unwrap();
+        let sm2_events: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM mastery_events WHERE source = 'sm2' AND concept_key = ?1",
+                params!["薄弱概念"],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(sm2_events, 3, "三次 SM-2 评分应产生 3 条 source='sm2' 事件");
     }
 }

@@ -1057,4 +1057,186 @@ mod tests {
             msg
         );
     }
+
+    // ========================================================================
+    // A2a: process_review → mastery 回流的接线覆盖
+    //
+    // 这组测试的存在意义：mastery/service.rs 的单元测试只覆盖
+    // MasteryService 单点，**不会**因为 process_review_with_expected 里
+    // 那行 reflux_mastery_for_review 被删掉而失败。此处补上该接线本身的覆盖。
+    // ========================================================================
+
+    /// 建一道带 tags 的题，返回 (exam_id, question_id, plan_id)
+    fn setup_question_with_plan(vfs_db: &Arc<VfsDatabase>, tag: &str) -> (String, String, String) {
+        let exam = VfsExamRepo::create_exam(vfs_db, "A2a 集成测试", None)
+            .expect("create exam")
+            .id;
+        let question = VfsQuestionRepo::create_question(
+            vfs_db,
+            &CreateQuestionParams {
+                exam_id: exam.clone(),
+                card_id: Some("card_a2a".to_string()),
+                question_label: Some("1".to_string()),
+                content: "1 + 1 = ?".to_string(),
+                options: None,
+                answer: Some("2".to_string()),
+                explanation: None,
+                question_type: None,
+                difficulty: None,
+                tags: Some(vec![tag.to_string()]),
+                source_type: None,
+                source_ref: None,
+                images: None,
+                parent_id: None,
+                structured_data: None,
+            },
+        )
+        .expect("create question");
+
+        let plan = ReviewPlanService::new(vfs_db.clone())
+            .create_review_plan(&question.id, &exam)
+            .expect("create review plan");
+        (exam, question.id, plan.id)
+    }
+
+    fn count_sm2_events(vfs_db: &Arc<VfsDatabase>, concept_key: &str) -> i64 {
+        vfs_db
+            .get_conn_safe()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM mastery_events WHERE source = 'sm2' AND concept_key = ?1",
+                rusqlite::params![concept_key],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    fn mastery_score(vfs_db: &Arc<VfsDatabase>, concept_key: &str) -> Option<f64> {
+        vfs_db
+            .get_conn_safe()
+            .unwrap()
+            .query_row(
+                "SELECT score FROM mastery_states WHERE concept_key = ?1",
+                rusqlite::params![concept_key],
+                |r| r.get(0),
+            )
+            .ok()
+    }
+
+    /// D1 主测试：评分必须真的经 process_review_with_expected 回流到掌握度。
+    ///
+    /// 删掉 `reflux_mastery_for_review` 的调用后，本测试必然失败——
+    /// 这正是它相对 mastery 单点测试的价值。
+    #[test]
+    fn process_review_refluxes_mastery_via_sm2_source() {
+        let (_temp_dir, vfs_db) = setup_test_db();
+        let service = ReviewPlanService::new(vfs_db.clone());
+        let (_exam, _qid, plan_id) = setup_question_with_plan(&vfs_db, "回流概念");
+
+        assert_eq!(count_sm2_events(&vfs_db, "回流概念"), 0, "评分前不应有 sm2 事件");
+
+        // quality=5 (Perfect) → Easy → signal 1.0
+        let result = service
+            .process_review(&plan_id, 5, Some("2".to_string()), Some(10))
+            .expect("process review");
+        assert!(result.passed);
+
+        let n = count_sm2_events(&vfs_db, "回流概念");
+        assert_eq!(
+            n, 1,
+            "process_review 必须回流一条 source='sm2' 事件（检查 reflux_mastery_for_review 接线）"
+        );
+
+        // 事件必须挂在已提交的 review_history.id 上（幂等键）
+        let expected_id = format!("me_sm2_{}", result.history.id);
+        let row: (String, String, f64) = vfs_db
+            .get_conn_safe()
+            .unwrap()
+            .query_row(
+                "SELECT source, outcome, signal FROM mastery_events WHERE id = ?1",
+                rusqlite::params![expected_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .expect("事件 id 应为 me_sm2_{history.id}");
+        assert_eq!(row.0, "sm2");
+        assert_eq!(row.1, "rating");
+        assert!((row.2 - 1.0).abs() < 1e-9, "quality=5 → Easy → signal 1.0");
+
+        // 掌握度必须上升（首次事件 → 高于默认 0.5，或至少被写入）
+        let score = mastery_score(&vfs_db, "回流概念").expect("掌握度状态应被写入");
+        assert!(
+            (0.0..=1.0).contains(&score),
+            "掌握度应在 [0,1]，实际 {score}"
+        );
+    }
+
+    /// 双向方向断言：连续低分必须让掌握度下降，而不是只有「有事件」。
+    #[test]
+    fn process_review_direction_follows_quality() {
+        let (_temp_dir, vfs_db) = setup_test_db();
+        let service = ReviewPlanService::new(vfs_db.clone());
+        let (_exam, _qid, plan_id) = setup_question_with_plan(&vfs_db, "方向概念");
+
+        // 先拉高
+        for _ in 0..3 {
+            service
+                .process_review(&plan_id, 5, None, None)
+                .expect("high quality review");
+        }
+        let high = mastery_score(&vfs_db, "方向概念").expect("有状态");
+
+        // 再连续答错（quality=0 → Blackout → Again → signal 0.0）
+        for _ in 0..3 {
+            service
+                .process_review(&plan_id, 0, None, None)
+                .expect("low quality review");
+        }
+        let low = mastery_score(&vfs_db, "方向概念").expect("有状态");
+
+        assert!(
+            low < high,
+            "连续 quality=0 之后掌握度必须下降：high={high} low={low}\n\
+             （若相等或上升，说明回流没生效或折档方向反了）"
+        );
+        assert_eq!(count_sm2_events(&vfs_db, "方向概念"), 6, "6 次评分应产生 6 条 sm2 事件");
+    }
+
+    /// 回流是旁路补偿：题目无 tags 时不得让 process_review 报错。
+    #[test]
+    fn process_review_survives_missing_concept_key() {
+        let (_temp_dir, vfs_db) = setup_test_db();
+        let service = ReviewPlanService::new(vfs_db.clone());
+
+        let exam = VfsExamRepo::create_exam(&vfs_db, "无 tag", None).expect("exam").id;
+        let question = VfsQuestionRepo::create_question(
+            &vfs_db,
+            &CreateQuestionParams {
+                exam_id: exam.clone(),
+                card_id: None,
+                question_label: Some("1".to_string()),
+                content: "no tags here".to_string(),
+                options: None,
+                answer: Some("x".to_string()),
+                explanation: None,
+                question_type: None,
+                difficulty: None,
+                tags: None, // ← 无 tags
+                source_type: None,
+                source_ref: None,
+                images: None,
+                parent_id: None,
+                structured_data: None,
+            },
+        )
+        .expect("question");
+        let plan = service
+            .create_review_plan(&question.id, &exam)
+            .expect("plan");
+
+        // 关键：即使回流跳过，评分本身必须成功（旁路不得阻断主流程）
+        let result = service
+            .process_review(&plan.id, 4, None, None)
+            .expect("评分必须成功，回流失效不得阻断");
+        assert!(result.passed);
+    }
 }

@@ -556,7 +556,7 @@ if [[ "$DEBUG_MODE" == true ]]; then
             -validity 10000 \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -keypass "$ANDROID_KEY_PASSWORD" \
-            -dname "CN=Deep Student Debug, OU=Development, O=Deep Student, L=Beijing, ST=Beijing, C=CN" \
+            -dname "CN=AI Study Debug, OU=Development, O=AI Study, L=Beijing, ST=Beijing, C=CN" \
             || die "创建调试密钥库失败"
         
         say "✓ 调试密钥库创建成功"
@@ -602,7 +602,7 @@ else
             -validity 10000 \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -keypass "${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}" \
-            -dname "CN=Deep Student, OU=Development, O=Deep Student, L=Beijing, ST=Beijing, C=CN"
+            -dname "CN=AI Study, OU=Development, O=AI Study, L=Beijing, ST=Beijing, C=CN"
         
         say "✓ 密钥库创建成功: $KEYSTORE_PATH"
     else
