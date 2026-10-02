@@ -2,13 +2,20 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 事件来源：题库 / FSRS 闪卡 / 灵感召回（Insight Recall v2 阶段二）
+/// 事件来源：题库 / FSRS 闪卡 / 灵感召回（Insight Recall v2 阶段二）/
+/// SM-2 间隔重复复习（A2a）
+///
+/// `Qbank` 与 `Sm2` 的区别是**证据类型**而非数据来源：两者都作用于
+/// `vfs.questions`，但 `Qbank` 代表首次作答（判对/判错），`Sm2` 代表
+/// 间隔重复复习的评分（quality 0-5）。A1 的日程聚合与 A3 的掌握度衰减
+/// 需要区分这两类证据，因此不复用同一枚举值。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MasterySource {
     Qbank,
     Fsrs,
     Insight,
+    Sm2,
 }
 
 impl MasterySource {
@@ -17,6 +24,7 @@ impl MasterySource {
             Self::Qbank => "qbank",
             Self::Fsrs => "fsrs",
             Self::Insight => "insight",
+            Self::Sm2 => "sm2",
         }
     }
 
@@ -25,6 +33,7 @@ impl MasterySource {
             "qbank" => Some(Self::Qbank),
             "fsrs" => Some(Self::Fsrs),
             "insight" => Some(Self::Insight),
+            "sm2" => Some(Self::Sm2),
             _ => None,
         }
     }

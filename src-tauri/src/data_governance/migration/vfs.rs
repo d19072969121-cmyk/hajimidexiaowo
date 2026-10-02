@@ -1069,6 +1069,29 @@ pub const V20260924_NOTE_EDITOR_LEASES: MigrationDef = MigrationDef::new(
 ])
 .idempotent();
 
+/// A2a: mastery_events.source CHECK 扩展——加入 'sm2' 源。
+///
+/// rename+recreate 重建（SQLite 无法 ALTER CHECK），先例 V20260909。
+/// 重建后 `mastery_events` 表本身不变，只扩展 source 的取值域，
+/// 因此 expected_tables 仍为单表；索引与 change_log 触发器在 SQL 内重建。
+pub const V20260925_MASTERY_EVENTS_SM2_SOURCE: MigrationDef = MigrationDef::new(
+    20260925,
+    "mastery_events_sm2_source",
+    include_str!("../../../migrations/vfs/V20260925__mastery_events_sm2_source.sql"),
+)
+.with_expected_tables(&["mastery_events"])
+.with_expected_indexes(&[
+    "idx_mastery_events_concept_time",
+    "idx_mastery_events_item_time",
+    "idx_mastery_events_local_version",
+    "idx_mastery_events_updated_at",
+    "idx_mastery_events_device_version",
+])
+.with_expected_queries(&[
+    "SELECT id FROM mastery_events WHERE source = 'sm2' LIMIT 0",
+])
+.idempotent();
+
 pub const VFS_MIGRATIONS: &[MigrationDef] = &[
     V20260130_INIT,
     V20260131_CHANGE_LOG,
@@ -1137,6 +1160,7 @@ pub const VFS_MIGRATIONS: &[MigrationDef] = &[
     V20260922_NOTE_STORAGE_FOUNDATIONS,
     V20260923_NOTE_HISTORY_INTEGRATION,
     V20260924_NOTE_EDITOR_LEASES,
+    V20260925_MASTERY_EVENTS_SM2_SOURCE,
 ];
 
 /// VFS 当前 Schema 版本，始终由已注册迁移的最后一项推导。
@@ -1301,15 +1325,15 @@ mod tests {
     }
 
     #[test]
-    fn test_note_history_is_registered_as_vfs_schema_head() {
-        assert_eq!(VFS_SCHEMA_VERSION, 20260924);
+    fn test_vfs_schema_head_is_registered() {
+        assert_eq!(VFS_SCHEMA_VERSION, 20260925);
         assert_eq!(
             V20260912_QBANK_GENERATION_TASKS.expected_tables,
             &["qbank_generation_tasks"]
         );
         assert_eq!(
             VFS_MIGRATIONS.last().map(|migration| migration.name),
-            Some("note_editor_leases")
+            Some("mastery_events_sm2_source")
         );
         assert!(V20260907_INSIGHT_CARDS
             .expected_tables
@@ -1317,6 +1341,10 @@ mod tests {
         assert!(V20260908_INSIGHT_FTS
             .expected_tables
             .contains(&"insight_fts"));
+        // A2a: sm2 源的注册不得回退既有 source 取值域。
+        assert!(V20260925_MASTERY_EVENTS_SM2_SOURCE
+            .expected_tables
+            .contains(&"mastery_events"));
     }
 
     #[test]

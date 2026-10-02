@@ -299,6 +299,12 @@ impl ReviewPlanService {
             plan_id, quality, passed, new_interval, next_review_date
         );
 
+        // A2a：评分事务已提交后，把复习结果回流到掌握度（同步幂等，键为 history.id）。
+        //
+        // 纪律：回流是旁路补偿。评分已经提交，此处**任何失败都不得让命令返回错误**，
+        // 否则用户会看到「评分成功但报错」并可能重复提交（与 FSRS 的 outbox 原则一致）。
+        self.reflux_mastery_for_review(&history);
+
         Ok(ProcessReviewResult {
             plan: updated_plan,
             passed,
@@ -306,6 +312,60 @@ impl ReviewPlanService {
             next_review_date,
             history,
         })
+    }
+
+    /// A2a: 把已提交的复习记录回流为掌握度事件（失败仅告警，绝不向上抛错）。
+    ///
+    /// 需要题目的 tags 才能解析 `concept_key`，因此在事务外重新读一次题目。
+    /// 题目已被删除 / 无 tags 时静默跳过——复习记录本身仍然有效。
+    fn reflux_mastery_for_review(&self, history: &ReviewHistory) {
+        let question = match crate::vfs::repos::question_repo::VfsQuestionRepo::get_question(
+            &self.vfs_db,
+            &history.question_id,
+        ) {
+            Ok(Some(question)) => question,
+            Ok(None) => {
+                debug!(
+                    "[ReviewPlanService] skip mastery reflux: question {} not found (history {})",
+                    history.question_id, history.id
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    "[ReviewPlanService] skip mastery reflux: failed to load question {} (history {}): {}",
+                    history.question_id, history.id, e
+                );
+                return;
+            }
+        };
+
+        let mastery = crate::mastery::MasteryService::new(Arc::clone(&self.vfs_db));
+        match mastery.record_sm2_review_rating_for_log(
+            &history.id,
+            &history.question_id,
+            &question.tags,
+            history.quality,
+        ) {
+            Ok(Some(state)) => {
+                debug!(
+                    "[ReviewPlanService] mastery reflux ok: history={}, concept={}, score={:.3}",
+                    history.id, state.concept_key, state.score
+                );
+            }
+            Ok(None) => {
+                debug!(
+                    "[ReviewPlanService] mastery reflux skipped (no concept_key): history={}",
+                    history.id
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "[ReviewPlanService] mastery reflux failed for history {}: {}",
+                    history.id, e
+                );
+            }
+        }
     }
 
     /// 计算新状态

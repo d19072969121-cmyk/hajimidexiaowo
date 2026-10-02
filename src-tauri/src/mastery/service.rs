@@ -84,6 +84,26 @@ pub fn concept_key_from_tags(tags: &[String], fallback_item_id: &str) -> Option<
     }
 }
 
+/// A2a: SM-2 的 quality(0..=5) 折合为 FSRS 语义的 rating(1..=4)。
+///
+/// 折档依据 SM-2 原始定义：
+/// - `quality < 3` 判为复习失败（EF 下调、repetitions 归零），故 0/1 → Again(1)
+/// - `quality == 2` 属于「想起来但严重困难」，是失败区上沿 → Hard(2)
+/// - `quality == 3` 是「正确但有困难」的下界 → Good(3)
+/// - `quality >= 4` 为「轻松 / 完美」 → Easy(4)
+///
+/// 越界 quality 返回 `None`，由调用方转成校验错误（与 FSRS 侧的
+/// `1..=4` 越界处理保持同构）。
+pub fn sm2_quality_to_rating(quality: u8) -> Option<u8> {
+    match quality {
+        0 | 1 => Some(1), // Again
+        2 => Some(2),     // Hard
+        3 => Some(3),     // Good
+        4 | 5 => Some(4), // Easy
+        _ => None,
+    }
+}
+
 pub struct MasteryService {
     vfs_db: Arc<VfsDatabase>,
 }
@@ -222,6 +242,57 @@ impl MasteryService {
             warn!(
                 "[Mastery] FSRS event committed but profile reflux failed for log {}: {}",
                 review_log_id, error
+            );
+        }
+        Ok(Some(state))
+    }
+
+    /// A2a: SM-2 复习评分后写入事件（同步幂等，键为已提交的 `review_history.id`）。
+    ///
+    /// 与 [`Self::record_fsrs_rating_for_log`] 同构，区别只在 source 与映射：
+    /// - source = [`MasterySource::Sm2`]（与首次作答的 `Qbank` 区分）
+    /// - 幂等键 `me_sm2_{review_history_id}`，`review_history.id` 形如 `rh_{nanoid(10)}`
+    ///   且为表主键，天然唯一；事务重放由 `ON CONFLICT DO NOTHING` 兜底
+    ///
+    /// 纪律（照抄 FSRS 回流）：**事件提交后任何失败都不得让调用方报错**——
+    /// 评分事务已提交，回流是旁路补偿，失败仅 warn。
+    ///
+    /// 无可用 concept_key 时返回 `Ok(None)`（与 FSRS 侧一致，不阻断调用方）。
+    pub fn record_sm2_review_rating_for_log(
+        &self,
+        review_history_id: &str,
+        question_id: &str,
+        tags: &[String],
+        quality: u8,
+    ) -> Result<Option<MasteryState>, AppError> {
+        let Some(concept) = concept_key_from_tags(tags, "") else {
+            return Ok(None);
+        };
+        let outcome = match sm2_quality_to_rating(quality) {
+            Some(rating) => MasteryOutcome::Rating(rating),
+            None => return Err(AppError::validation("SM-2 quality must be 0..=5")),
+        };
+        let event_id = format!("me_sm2_{}", review_history_id.trim());
+        let mut conn = self
+            .vfs_db
+            .get_conn_safe()
+            .map_err(|e| AppError::database(e.to_string()))?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| AppError::database(e.to_string()))?;
+        let state = self.record_event_with_conn(
+            &tx,
+            Some(&event_id),
+            MasterySource::Sm2,
+            &concept,
+            question_id,
+            &outcome,
+        )?;
+        tx.commit().map_err(|e| AppError::database(e.to_string()))?;
+        if let Err(error) = self.sync_learner_profile(&state) {
+            warn!(
+                "[Mastery] SM-2 event committed but profile reflux failed for history {}: {}",
+                review_history_id, error
             );
         }
         Ok(Some(state))
@@ -1776,5 +1847,113 @@ mod tests {
         );
         assert_eq!(summary.today_priority_review[0].concept_key, "优先复习概念");
         assert_eq!(summary.today_priority_review[0].priority, 1);
+    }
+
+    // ========================================================================
+    // A2a: SM-2 复习评分 → 掌握度回流
+    // ========================================================================
+
+    #[test]
+    fn sm2_quality_mapping_covers_full_domain_and_rejects_out_of_range() {
+        // 0-1 → Again；2 → Hard；3 → Good；4-5 → Easy
+        assert_eq!(sm2_quality_to_rating(0), Some(1));
+        assert_eq!(sm2_quality_to_rating(1), Some(1));
+        assert_eq!(sm2_quality_to_rating(2), Some(2));
+        assert_eq!(sm2_quality_to_rating(3), Some(3));
+        assert_eq!(sm2_quality_to_rating(4), Some(4));
+        assert_eq!(sm2_quality_to_rating(5), Some(4));
+        // 越界必须显式失败，不得静默折中
+        assert_eq!(sm2_quality_to_rating(6), None);
+        assert_eq!(sm2_quality_to_rating(255), None);
+    }
+
+    #[test]
+    fn sm2_review_writes_event_with_sm2_source_and_rating_outcome() {
+        let (_tmp, vfs, svc) = setup();
+        let qid = seed_question(&vfs, "SM2概念");
+
+        svc.record_sm2_review_rating_for_log("rh_test0001", &qid, &["SM2概念".into()], 4)
+            .unwrap()
+            .expect("state emitted");
+
+        let conn = vfs.get_conn_safe().unwrap();
+        let (source, outcome, signal): (String, String, f64) = conn
+            .query_row(
+                "SELECT source, outcome, signal FROM mastery_events WHERE id = ?1",
+                params!["me_sm2_rh_test0001"],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .expect("sm2 event row");
+
+        assert_eq!(source, "sm2", "A2a 事件必须以 sm2 源落库");
+        assert_eq!(outcome, "rating", "SM-2 评分应落为 rating outcome");
+        assert!((signal - 1.0).abs() < 1e-9, "quality=4 → Easy → signal 1.0");
+    }
+
+    #[test]
+    fn sm2_review_is_idempotent_by_history_id() {
+        let (_tmp, vfs, svc) = setup();
+        let qid = seed_question(&vfs, "幂等概念");
+
+        // 同一 review_history.id 重放（事务重试/客户端重提交）
+        for _ in 0..3 {
+            svc.record_sm2_review_rating_for_log("rh_dup00001", &qid, &["幂等概念".into()], 3)
+                .unwrap();
+        }
+
+        let conn = vfs.get_conn_safe().unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM mastery_events WHERE id = ?1",
+                params!["me_sm2_rh_dup00001"],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1, "同一 history id 只应产生一条事件");
+    }
+
+    #[test]
+    fn sm2_review_skips_without_usable_concept_key() {
+        let (_tmp, _vfs, svc) = setup();
+        // 空 question_id 且无 tags → concept_key_from_tags 返回 None
+        let result = svc
+            .record_sm2_review_rating_for_log("rh_noconcept", "", &[], 3)
+            .unwrap();
+        assert!(result.is_none(), "无 concept_key 应静默跳过而非报错");
+    }
+
+    #[test]
+    fn sm2_review_rejects_invalid_quality() {
+        let (_tmp, _vfs, svc) = setup();
+        let err = svc
+            .record_sm2_review_rating_for_log("rh_badq", "q1", &["某概念".into()], 6)
+            .unwrap_err();
+        assert!(
+            format!("{err}").contains("quality"),
+            "越界 quality 应给出明确校验错误，实际: {err}"
+        );
+    }
+
+    #[test]
+    fn sm2_review_feeds_weak_concepts_like_other_sources() {
+        let (_tmp, _vfs, svc) = setup();
+        let qid = seed_question(&_vfs, "薄弱概念");
+
+        // 连续三次低分（quality=0/1 → Again → signal 0.0）
+        for i in 0..3 {
+            svc.record_sm2_review_rating_for_log(
+                &format!("rh_weak{i}"),
+                &qid,
+                &["薄弱概念".into()],
+                1,
+            )
+            .unwrap();
+        }
+
+        let weak = svc.weak_concepts(10).unwrap();
+        assert!(
+            weak.iter().any(|s| s.concept_key == "薄弱概念"),
+            "SM-2 连续低分应使概念进入薄弱列表（证明回流真的参与聚合）"
+        );
     }
 }
