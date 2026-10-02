@@ -1,4 +1,4 @@
-package com.deepstudent.app
+package com.aistudy.app
 
 import android.app.Activity
 import android.content.Intent

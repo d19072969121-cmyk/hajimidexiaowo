@@ -41,7 +41,7 @@ if ! "$ADB" devices 2>/dev/null | grep -qE "device$"; then
     die "未检测到已连接的 Android 设备/模拟器。请先启动模拟器"
 fi
 
-APP_PACKAGE="com.deepstudent.app"
+APP_PACKAGE="com.aistudy.app"
 MODE="${1:-all}"
 
 show_help() {

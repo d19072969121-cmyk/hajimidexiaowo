@@ -1,8 +1,8 @@
 [package]
 name = "deep-student"
 version = "0.9.73"
-description = "Deep Student - AI驱动的智能学习助手"
-authors = ["helixnow"]
+description = "AI Study - AI驱动的智能学习助手（基于 Deep Student 二次创作）"
+authors = ["helixnow", "AI Study contributors"]
 edition = "2021"
 default-run = "deep-student"
 license = "AGPL-3.0-or-later"

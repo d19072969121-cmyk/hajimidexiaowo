@@ -338,7 +338,7 @@ pub fn payload_root() -> Result<PathBuf, String> {
     let local_app_data = dirs::data_local_dir()
         .ok_or_else(|| "Failed to locate LocalAppData for Windows shell payloads".to_string())?;
     let root = local_app_data
-        .join("com.deepstudent.app")
+        .join("com.aistudy.app")
         .join("shell-payloads");
     fs::create_dir_all(&root)
         .map_err(|error| format!("Failed to create Windows shell payload directory: {error}"))?;

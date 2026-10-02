@@ -382,7 +382,7 @@ IPA_SIZE=$(du -h "$FINAL_IPA_PATH" | cut -f1)
 IPA_SHA256=$(shasum -a 256 "$FINAL_IPA_PATH" | cut -d' ' -f1)
 
 # 获取 Bundle Identifier
-BUNDLE_ID=$(defaults read "$APP_PATH/Info.plist" CFBundleIdentifier 2>/dev/null || echo "com.deepstudent.app")
+BUNDLE_ID=$(defaults read "$APP_PATH/Info.plist" CFBundleIdentifier 2>/dev/null || echo "com.aistudy.app")
 
 # 获取构建信息
 BUILD_NUMBER=$(defaults read "$APP_PATH/Info.plist" CFBundleVersion 2>/dev/null || echo "1")

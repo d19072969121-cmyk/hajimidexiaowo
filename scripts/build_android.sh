@@ -35,15 +35,15 @@ show_build_menu() {
     echo -e "\033[1;35m║\033[0m  请选择构建模式：                                          \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m                                                            \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m  \033[1;32m1)\033[0m 🚀 正式发布                                          \033[1;35m║\033[0m"
-    echo -e "\033[1;35m║\033[0m     使用正式密钥库签名，原包名 com.deepstudent.app         \033[1;35m║\033[0m"
+    echo -e "\033[1;35m║\033[0m     使用正式密钥库签名，包名 com.aistudy.app               \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m     适用于：生产环境发布、Google Play 上传                \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m                                                            \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m  \033[1;33m2)\033[0m 🔧 测试版（同包名）                                   \033[1;35m║\033[0m"
-    echo -e "\033[1;35m║\033[0m     使用开发密钥库，原包名 com.deepstudent.app             \033[1;35m║\033[0m"
+    echo -e "\033[1;35m║\033[0m     使用开发密钥库，包名 com.aistudy.app                   \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m     适用于：覆盖安装测试、快速调试                         \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m                                                            \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m  \033[1;34m3)\033[0m 🧪 测试版（不同包名）                                 \033[1;35m║\033[0m"
-    echo -e "\033[1;35m║\033[0m     使用开发密钥库，包名 com.deepstudent.app.dev           \033[1;35m║\033[0m"
+    echo -e "\033[1;35m║\033[0m     使用开发密钥库，包名 com.aistudy.app.dev               \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m     适用于：与正式版共存测试、对比调试                     \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m                                                            \033[1;35m║\033[0m"
     echo -e "\033[1;35m║\033[0m  \033[1;31m0)\033[0m 退出                                                 \033[1;35m║\033[0m"
@@ -210,7 +210,7 @@ inject_android_permissions() {
 # 这些文件，缺失时 install_apk 命令会在运行期报"插件未初始化"。
 sync_apk_installer_files() {
     local SRC_KT="$REPO_ROOT/src-tauri/mobile/android/ApkInstallerPlugin.kt"
-    local DST_KT="$REPO_ROOT/src-tauri/gen/android/app/src/main/java/com/deepstudent/app/ApkInstallerPlugin.kt"
+    local DST_KT="$REPO_ROOT/src-tauri/gen/android/app/src/main/java/com/aistudy/app/ApkInstallerPlugin.kt"
     local SRC_XML="$REPO_ROOT/src-tauri/mobile/android/res/xml/file_paths.xml"
     local DST_XML="$REPO_ROOT/src-tauri/gen/android/app/src/main/res/xml/file_paths.xml"
 
@@ -271,7 +271,7 @@ sync_main_activity() {
     local FILE SRC DST
     for FILE in MainActivity.kt SafPermissionPlugin.kt; do
         SRC="$REPO_ROOT/src-tauri/mobile/android/$FILE"
-        DST="$REPO_ROOT/src-tauri/gen/android/app/src/main/java/com/deepstudent/app/$FILE"
+        DST="$REPO_ROOT/src-tauri/gen/android/app/src/main/java/com/aistudy/app/$FILE"
         [[ -f "$SRC" ]] || die "受控 Android 文件不存在: $SRC"
         [[ -d "$(dirname "$DST")" ]] || die "Android 工程 java 目录不存在: $(dirname "$DST")"
         if ! cmp -s "$SRC" "$DST" 2>/dev/null; then
@@ -538,7 +538,7 @@ if [[ "$DEBUG_MODE" == true ]]; then
     
     # 使用调试密钥库路径和固定密码
     KEYSTORE_PATH="$REPO_ROOT/build-android/dev-release.keystore"
-    KEY_ALIAS="deepstudent-debug"
+    KEY_ALIAS="aistudy-debug"
     ANDROID_KEYSTORE_PASSWORD="android"
     ANDROID_KEY_PASSWORD="android"
     
@@ -570,7 +570,7 @@ else
 
     # 密钥库路径
     KEYSTORE_PATH="${ANDROID_KEYSTORE_PATH:-$HOME/.android/release.keystore}"
-    KEY_ALIAS="${ANDROID_KEY_ALIAS:-deepstudent}"
+    KEY_ALIAS="${ANDROID_KEY_ALIAS:-aistudy}"
 
     # 如果密钥库不存在，创建新的
     if [[ ! -f "$KEYSTORE_PATH" ]]; then

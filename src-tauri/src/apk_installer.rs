@@ -31,7 +31,7 @@ pub fn init() -> TauriPlugin<tauri::Wry> {
             #[cfg(target_os = "android")]
             {
                 let handle =
-                    api.register_android_plugin("com.deepstudent.app", "ApkInstallerPlugin")?;
+                    api.register_android_plugin("com.aistudy.app", "ApkInstallerPlugin")?;
                 tauri::Manager::manage(app, ApkInstallerHandle(handle));
             }
             let _ = app;

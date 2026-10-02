@@ -438,7 +438,7 @@ pub(crate) fn saf_permission_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> 
     tauri::plugin::Builder::new("saf-permission")
         .setup(|app, api| {
             let handle =
-                api.register_android_plugin("com.deepstudent.app", "SafPermissionPlugin")?;
+                api.register_android_plugin("com.aistudy.app", "SafPermissionPlugin")?;
             tauri::Manager::manage(app, SafPermissionHandle(handle));
             Ok(())
         })
