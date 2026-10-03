@@ -59,6 +59,9 @@ const CONTEXTUAL_ENTRY_VIEWS = new Set([
   'crepe-demo',            // DEV：Crepe 编辑器演示
   'chat-v2-test',          // DEV：Chat V2 集成测试页
   'llm-playground',        // DEV：LLM 输出模拟游乐场
+  // A3-P0：解析结果全屏任务页。由「拍题/答疑」流程推入（拍题 → 解析 → 错题 → 复习），
+  // 是任务流中间态而非常驻目的地，故不进抽屉/命令面板——与 pdf-reader 同性质。
+  'analysis-result',
 ]);
 
 /** 匹配 view: 'xxx'（含 view: 'xxx' as CurrentView / as NavViewType） */

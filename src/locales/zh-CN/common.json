@@ -1149,7 +1149,8 @@
     "chat_v2_test": "Chat V2 Test",
     "toggle_sidebar": "切换边栏",
     "resize_sidebar": "调整边栏宽度",
-    "llm_playground": "LLM Playground"
+    "llm_playground": "LLM Playground",
+    "analysis_result": "解析结果"
   },
   "time": {
     "now": "刚刚",

@@ -218,6 +218,28 @@ jobs:
       - name: Generate version info
         run: node scripts/generate-version.mjs
 
+      # ── 前端构建（二创修正：上游依赖 FRONTEND_DIST_ARTIFACT 预构建产物，
+      #    DIY 版既无该 artifact、又无 vite build 步骤，属遗漏）──
+      # 为何直接跑 vite 而不是 npm run build：
+      #   npm run build 会触发 package.json 的 prebuild
+      #   (version:generate + licenses:check + typecheck)。typecheck 在
+      #   CI runner 上额外吃 2-3GB 堆（本机实测 4GB 上限才通过），而
+      #   6144MB 堆要与 Rust/Gradle 共享同 runner，叠加会显著抬高 OOM 概率。
+      #   version:generate 已在上一 step 单独跑过；licenses:check 与产物
+      #   正确性无关，不应成为出包阻断点（与上方去掉 --locked 同一取舍）。
+      # 为何不能省：dist/ 被 .gitignore:70,138 忽略（git ls-files dist/ = 0），
+      #   干净 runner 上不存在；tauri.conf.json:7 的 frontendDist="../dist"
+      #   在无 dist 时必然失败。虽 beforeBuildCommand="npm run build" 理论上
+      #   会兜底重建，但那是上述高内存路径，故显式前置构建并让 Tauri 跳过重建。
+      - name: Build frontend (vite)
+        run: npx vite build
+
+      - name: Verify frontend artifact exists
+        run: |
+          test -f dist/index.html \
+            || { echo "::error::dist/index.html missing after vite build"; exit 1; }
+          echo "✅ dist/index.html present ($(du -sh dist | cut -f1))"
+
       - name: Initialize Android project
         run: npx tauri android init
 
@@ -247,7 +269,7 @@ jobs:
           echo "✅ windowSoftInputMode=adjustResize present"
 
           SRC="src-tauri/mobile/android/MainActivity.kt"
-          DST="src-tauri/gen/android/app/src/main/java/com/deepstudent/app/MainActivity.kt"
+          DST="src-tauri/gen/android/app/src/main/java/com/aistudy/app/MainActivity.kt"
           test -f "$SRC" || { echo "::error::managed MainActivity.kt missing at $SRC"; exit 1; }
           test -d "$(dirname "$DST")" || { echo "::error::generated Android java dir missing at $(dirname "$DST")"; exit 1; }
           cp "$SRC" "$DST"
@@ -255,14 +277,14 @@ jobs:
           echo "✅ MainActivity.kt synced from managed copy"
 
           SRC="src-tauri/mobile/android/SafPermissionPlugin.kt"
-          DST="src-tauri/gen/android/app/src/main/java/com/deepstudent/app/SafPermissionPlugin.kt"
+          DST="src-tauri/gen/android/app/src/main/java/com/aistudy/app/SafPermissionPlugin.kt"
           test -f "$SRC" || { echo "::error::managed SafPermissionPlugin.kt missing at $SRC"; exit 1; }
           cp "$SRC" "$DST"
           cmp -s "$SRC" "$DST" || { echo "::error::SafPermissionPlugin.kt sync verification failed"; exit 1; }
           echo "✅ SafPermissionPlugin.kt synced from managed copy"
 
           SRC="src-tauri/mobile/android/ApkInstallerPlugin.kt"
-          DST="src-tauri/gen/android/app/src/main/java/com/deepstudent/app/ApkInstallerPlugin.kt"
+          DST="src-tauri/gen/android/app/src/main/java/com/aistudy/app/ApkInstallerPlugin.kt"
           test -f "$SRC" || { echo "::error::managed ApkInstallerPlugin.kt missing at $SRC"; exit 1; }
           cp "$SRC" "$DST"
           cmp -s "$SRC" "$DST" || { echo "::error::ApkInstallerPlugin.kt sync verification failed"; exit 1; }
@@ -391,8 +413,18 @@ jobs:
           # 出包阻断点。cargo metadata 已在上方做过真实自洽校验。
           # 有意去掉上游的 with-resource-monitor.sh 包装：它只产出诊断日志，
           # 却额外依赖 setsid + /usr/bin/time，增加失败面。
+          # 前端已由上方 "Build frontend (vite)" 步骤预构建，此处必须覆盖
+          # beforeBuildCommand，否则 tauri 会再跑一次 tauri.conf.json 的
+          # npm run build → prebuild(typecheck + licenses:check + vite build)，
+          # 在 6144MB 堆与 Rust/Gradle 共享 runner 的前提下显著抬高 OOM 概率。
+          # 但不能置空：tauri android build 在跑 hook 之前会先用 tauri.conf.json
+          # 的静态 versionCode 重写 gen/android/app/tauri.properties，需靠 hook
+          # 里的 version:generate 把生成器的稳定 versionCode 写回（同上游
+          # reusable-build-android.yml:395-404 的处理）。
           timeout --signal=TERM --kill-after=60s 165m \
-            npx tauri android build --target aarch64 --apk --ci --features mobile-slim -- --no-default-features
+            npx tauri android build --target aarch64 --apk --ci \
+              --config '{"build":{"beforeBuildCommand":"node scripts/generate-version.mjs"}}' \
+              --features mobile-slim -- --no-default-features
           status=$?
           set -e
 
@@ -430,23 +462,23 @@ jobs:
             echo "🔐 Using provided release keystore from secrets"
             echo "${KEYSTORE_BASE64}" | base64 -d > /tmp/release.keystore
             test -s /tmp/release.keystore || { echo "::error::ANDROID_KEYSTORE_BASE64 decoded to an empty keystore"; exit 1; }
-            SIGN_ALIAS="${KEY_ALIAS_SECRET:-deepstudent}"
+            SIGN_ALIAS="${KEY_ALIAS_SECRET:-aistudy}"
             SIGN_STORE_PASS="${KEYSTORE_PASSWORD}"
             SIGN_KEY_PASS="${KEY_PASSWORD}"
           else
             echo "🔓 No signing secrets configured — generating a self-signed dev keystore"
-            echo "::notice::APK will be signed with a freshly generated dev keystore (alias deepstudent-debug). It cannot upgrade-install over an official build; uninstall first."
+            echo "::notice::APK will be signed with a freshly generated dev keystore (alias aistudy-debug). It cannot upgrade-install over an official build; uninstall first."
             keytool -genkeypair \
               -v \
               -keystore /tmp/release.keystore \
-              -alias deepstudent-debug \
+              -alias aistudy-debug \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
               -storepass android \
               -keypass android \
-              -dname "CN=Deep Student Debug, OU=Development, O=Deep Student, L=Beijing, ST=Beijing, C=CN"
-            SIGN_ALIAS="deepstudent-debug"
+              -dname "CN=AI Study Debug, OU=Development, O=AI Study, L=Beijing, ST=Beijing, C=CN"
+            SIGN_ALIAS="aistudy-debug"
             SIGN_STORE_PASS="android"
             SIGN_KEY_PASS="android"
           fi

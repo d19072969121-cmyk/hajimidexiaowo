@@ -2578,6 +2578,7 @@ function App() {
       'crepe-demo': t('common:navigation.crepe_demo'),
       'chat-v2-test': t('common:navigation.chat_v2_test'),
       'llm-playground': t('common:navigation.llm_playground'),
+      'analysis-result': t('common:navigation.analysis_result'),
     };
 
     return labels[currentView] ?? t('common:app.default_header');

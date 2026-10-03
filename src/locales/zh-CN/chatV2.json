@@ -2367,5 +2367,21 @@
       "hoursAgo": "{{count}} 小时前",
       "daysAgo": "{{count}} 天前"
     }
+  },
+  "analysisResult": {
+    "title": "解析结果",
+    "back": "返回",
+    "copy": "复制解析",
+    "retry": "重试",
+    "loading": "正在解析题目…",
+    "question": "题目",
+    "answer": "解析",
+    "tags": "知识点",
+    "rawText": "原始识别文本",
+    "note": "学习笔记",
+    "notePlaceholder": "记下你的思路或易错点…",
+    "imageCount": "已附 {{count}} 张题目图片",
+    "unknownError": "解析失败，请重试",
+    "emptyHint": "还没有解析结果。拍一张题目照片或从相册选图，识别后结果会显示在这里。"
   }
 }

@@ -2367,5 +2367,21 @@
       "hoursAgo": "{{count}}h ago",
       "daysAgo": "{{count}}d ago"
     }
+  },
+  "analysisResult": {
+    "title": "Analysis Result",
+    "back": "Back",
+    "copy": "Copy analysis",
+    "retry": "Retry",
+    "loading": "Analyzing question…",
+    "question": "Question",
+    "answer": "Analysis",
+    "tags": "Knowledge points",
+    "rawText": "Raw recognized text",
+    "note": "Study note",
+    "notePlaceholder": "Jot down your reasoning or common pitfalls…",
+    "imageCount": "{{count}} question image(s) attached",
+    "unknownError": "Analysis failed, please retry",
+    "emptyHint": "No analysis result yet. Take a photo of the question or pick an image from your gallery — the result will appear here once recognized."
   }
 }

@@ -746,7 +746,8 @@
     "chat_v2_test": "Chat V2 Test",
     "toggle_sidebar": "Toggle sidebar",
     "resize_sidebar": "Resize sidebar",
-    "llm_playground": "LLM Playground"
+    "llm_playground": "LLM Playground",
+    "analysis_result": "Analysis Result"
   },
   "time": {
     "now": "Just now",

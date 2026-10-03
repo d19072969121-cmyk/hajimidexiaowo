@@ -24,7 +24,8 @@ export type CurrentView =
   | 'todo'              // 待办事项独立页面
   | 'flashcards'        // 闪卡复习（传统壳入口；OS 模式仍走学习桌面应用）
   | 'chat-v2-test'      // Chat V2 集成测试页面（开发用）
-  | 'llm-playground';    // LLM 输出模拟游乐场（开发用）
+  | 'llm-playground'    // LLM 输出模拟游乐场（开发用）
+  | 'analysis-result';  // A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 中间环节）
 
 /**
  * 导航历史项：包含视图、参数和状态恢复函数

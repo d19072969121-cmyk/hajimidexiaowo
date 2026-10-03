@@ -41,6 +41,9 @@ const BASE_CANONICAL_VIEWS: CurrentView[] = [
   'skills-management',
   'todo',
   'flashcards',
+  // A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 的中间环节）
+  // 必须登记在此，否则 canonicalizeView 会把 'analysis-result' 静默落回 'chat-v2'
+  'analysis-result',
 ];
 
 const DEV_ONLY_VIEWS: CurrentView[] = ['crepe-demo', 'chat-v2-test', 'llm-playground'];
