@@ -48,8 +48,6 @@ export interface CapturePageProps {
   isSubmitting?: boolean;
   /** 处理失败的原因（宿主侧传入） */
   error?: string | null;
-  /** 进入普通对话（不是拍题） */
-  onOpenChat?: () => void;
   className?: string;
 }
 
@@ -60,7 +58,6 @@ export const CapturePage: React.FC<CapturePageProps> = ({
   onSubmitImages,
   isSubmitting = false,
   error = null,
-  onOpenChat,
   className,
 }) => {
   const { t } = useTranslation();
@@ -74,9 +71,20 @@ export const CapturePage: React.FC<CapturePageProps> = ({
 
   const headerTitle = t('capture.title', '拍题');
 
+  /**
+   * 顶栏。
+   *
+   * ⚠️ `suppressGlobalBackButton: true` 是必需的：拍题是 study Tab 的**根页**，
+   *    没有「上一页」可回。不抑制时统一顶栏会渲染全局返回按钮
+   *    （UnifiedMobileHeader.tsx:75 的兜底分支），用户会看到左上角一个
+   *    点了不知道去哪的返回箭头。
+   */
   useMobileHeader(
     'capture',
-    { title: headerTitle },
+    {
+      title: headerTitle,
+      suppressGlobalBackButton: true,
+    },
     [headerTitle],
   );
 
@@ -131,19 +139,12 @@ export const CapturePage: React.FC<CapturePageProps> = ({
       data-can-capture={String(canCapturePhoto)}
       className={cn('flex h-full min-h-0 flex-col bg-background', className)}
     >
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-        <h1 className="flex-1 truncate text-base font-medium text-foreground">{headerTitle}</h1>
-        {onOpenChat && (
-          <DsButton
-            variant="ghost"
-            size="sm"
-            data-testid="capture-open-chat"
-            onClick={onOpenChat}
-          >
-            {t('capture.openChat', '直接对话')}
-          </DsButton>
-        )}
-      </header>
+      {/*
+        ⚠️ 这里刻意**不画顶栏**：移动端有统一顶栏（useMobileHeader 注册，
+        由 UnifiedMobileHeader 渲染），页面自绘第二条顶栏会双重显示。
+        同时移除了原有的「直接对话」按钮——它与首页（对话）功能重复，
+        用户在底栏点「首页」即可，不需要在拍题页再放一个入口。
+      */}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {/* 主操作：拍照 / 相册 */}

@@ -555,7 +555,7 @@ impl ChatV2Repo {
         limit: u32,
     ) -> ChatV2Result<Vec<ChatSession>> {
         let conn = db.get_conn_safe()?;
-        Self::list_sessions_with_conn(&conn, status, None, limit, 0)
+        Self::list_sessions_with_conn(&conn, status, None, None, limit, 0)
     }
 
     /// 列出会话（使用现有连接）
@@ -563,12 +563,18 @@ impl ChatV2Repo {
     /// ## 参数
     /// - `conn`: 数据库连接
     /// - `status`: 可选的状态过滤（active/archived/deleted）
+    /// - `exclude_modes`: 需要排除的会话模式。传空/None 表示**不额外排除**
+    ///   （仅保留原有的 `mode != 'agent'` 规则）。
+    ///   用途：拍题（`analysis`）会话是真实内容而非常规对话，不应出现在
+    ///   首页会话列表里，但仍须能被错题本按 `mode='analysis'` 查到——
+    ///   故排除规则由**调用方**决定，不做全局硬编码。
     /// - `limit`: 数量限制
     /// - `offset`: 偏移量（用于分页）
     pub fn list_sessions_with_conn(
         conn: &Connection,
         status: Option<&str>,
         group_id: Option<&str>,
+        exclude_modes: Option<&[String]>,
         limit: u32,
         offset: u32,
     ) -> ChatV2Result<Vec<ChatSession>> {
@@ -583,6 +589,18 @@ impl ChatV2Repo {
         );
         Self::append_visible_session_filter(&mut sql);
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        // 调用方指定的模式排除（如首页日志排除 analysis）
+        if let Some(modes) = exclude_modes {
+            let valid: Vec<&String> = modes.iter().filter(|m| !m.trim().is_empty()).collect();
+            if !valid.is_empty() {
+                let placeholders = vec!["?"; valid.len()].join(", ");
+                sql.push_str(&format!(" AND mode NOT IN ({})", placeholders));
+                for m in valid {
+                    params_vec.push(Box::new(m.clone()));
+                }
+            }
+        }
 
         if let Some(s) = status {
             sql.push_str(" AND persist_status = ?");
@@ -3430,8 +3448,23 @@ impl ChatV2Repo {
         limit: u32,
         offset: u32,
     ) -> ChatV2Result<Vec<ChatSession>> {
+        Self::list_sessions_v2_excluding(db, status, group_id, None, limit, offset)
+    }
+
+    /// 同 `list_sessions_v2`，但可指定要排除的模式。
+    ///
+    /// `exclude_modes` 为 None 时行为与 `list_sessions_v2` 完全一致
+    /// （保留给既有调用方，避免逐个改签名）。
+    pub fn list_sessions_v2_excluding(
+        db: &ChatV2Database,
+        status: Option<&str>,
+        group_id: Option<&str>,
+        exclude_modes: Option<&[String]>,
+        limit: u32,
+        offset: u32,
+    ) -> ChatV2Result<Vec<ChatSession>> {
         let conn = db.get_conn_safe()?;
-        Self::list_sessions_with_conn(&conn, status, group_id, limit, offset)
+        Self::list_sessions_with_conn(&conn, status, group_id, exclude_modes, limit, offset)
     }
 
     /// 获取会话总数（使用 ChatV2Database）
@@ -4705,7 +4738,7 @@ mod tests {
 
         // List
         let sessions =
-            ChatV2Repo::list_sessions_with_conn(&conn, Some("archived"), None, 10, 0).unwrap();
+            ChatV2Repo::list_sessions_with_conn(&conn, Some("archived"), None, None, 10, 0).unwrap();
         assert_eq!(sessions.len(), 1);
 
         // Delete (using transaction)

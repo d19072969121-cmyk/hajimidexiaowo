@@ -83,9 +83,31 @@ describe('ReviewHubPage 归类 UI', () => {
 
   it('渲染四个入口（错题本 / 单词卡片 / 易错点 / 刷题）', () => {
     render(<ReviewHubPage />);
-    for (const id of ['mistakes', 'flashcards', 'weak-points', 'practice']) {
+    for (const id of ['mistakes', 'knowledge-cards', 'weak-points', 'practice']) {
       expect(screen.getByTestId(`review-hub-entry-${id}`)).toBeInTheDocument();
     }
+  });
+
+  it('点错题条目会回调 onOpenMistake（曾整条不可点，用户点不开）', () => {
+    // 用户反馈：「根本不知道自己错的哪个题，点 UI 也点不开」。
+    // 原实现里条目是个纯 <li>，没有任何点击处理。
+    const onOpenMistake = vi.fn();
+    render(<ReviewHubPage onOpenMistake={onOpenMistake} />);
+
+    fireEvent.click(screen.getByTestId('review-hub-open-s1'));
+    expect(onOpenMistake).toHaveBeenCalledWith('s1');
+  });
+
+  it('标签的「×」不会触发条目点开（交互隔离）', () => {
+    // 标签删除与「打开错题」是两个独立交互。若把整条做成可点容器，
+    // 点「×」会误触打开。此处断言两者互不干扰。
+    tagsBySession = new Map([['s1', ['代数']]]);
+    const onOpenMistake = vi.fn();
+    render(<ReviewHubPage onOpenMistake={onOpenMistake} />);
+
+    fireEvent.click(screen.getByTestId('review-hub-untag-s1-代数'));
+    expect(removeTag).toHaveBeenCalledWith('s1', '代数');
+    expect(onOpenMistake).not.toHaveBeenCalled();
   });
 
   it('四个入口各自的跳转目标正确（防止改了 view 却无感）', () => {
@@ -94,17 +116,17 @@ describe('ReviewHubPage 归类 UI', () => {
     const onNavigate = vi.fn();
     render(<ReviewHubPage onNavigate={onNavigate} />);
 
-    // 单词卡片 → flashcards
-    fireEvent.click(screen.getByTestId('review-hub-entry-flashcards'));
-    expect(onNavigate).toHaveBeenCalledWith('flashcards');
+    // 知识卡片（原「单词卡片」）→ 独立页 knowledge-cards（E5 起与易错点分开）
+    fireEvent.click(screen.getByTestId('review-hub-entry-knowledge-cards'));
+    expect(onNavigate).toHaveBeenCalledWith('knowledge-cards');
 
     // 刷题 → practice-hub（E3 起独立入口页，不再占位跳 flashcards）
     fireEvent.click(screen.getByTestId('review-hub-entry-practice'));
     expect(onNavigate).toHaveBeenCalledWith('practice-hub');
 
-    // 易错点 → 仍是 flashcards（错因维度复用其视图，尚未独立）
+    // 易错点 → 独立页 weak-points（不再与知识卡片共用 flashcards 界面）
     fireEvent.click(screen.getByTestId('review-hub-entry-weak-points'));
-    expect(onNavigate).toHaveBeenCalledWith('flashcards');
+    expect(onNavigate).toHaveBeenCalledWith('weak-points');
   });
 
   it('条目就绪后按会话 id 批量拉取标签', () => {

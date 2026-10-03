@@ -288,25 +288,49 @@ modeRegistry.register('analysis', {
   /**
    * 构建系统提示
    * 注入 OCR 识别结果到系统提示中
+   *
+   * ## 提示词修订说明（E5）
+   * 修订前的主要问题是**用户在真机上拍整页题时，模型会把题目原样转录回来而不解题**。
+   * 根因有三处（均为提示词层面，非模型能力问题）：
+   *  1. 未说明「图里可能有多道题」——模型面对整页题目不知如何组织输出，
+   *     退化为逐字抄写；
+   *  2. 未禁止「重述题目」——「仔细阅读题目内容」这句容易被模型理解为
+   *     「先把题目写出来」，于是输出成了转录；
+   *  3. OCR 文本以「【识别到的题目内容】」形式注在末尾，模型易把自己
+   *     当成续写 OCR 的转录器，且在 OCR 有错时**以错误文本为准**。
+   *
+   * 现在明确三件事：多题自适应、不要重述原文、以图片为准（OCR 仅辅助）。
    */
   buildSystemPrompt: (context: SystemPromptContext): string => {
     const modeState = context.modeState as unknown as AnalysisModeState | null;
     const ocrMeta = modeState?.ocrMeta;
 
-    let systemPrompt = `你是一个专业的题目分析助手。请根据用户提供的题目图片和识别结果，进行详细的解题分析。
+    let systemPrompt = `你是一个专业的题目解答助手。用户会给你一张（或几张）题目照片，请**直接解答**。
 
-分析要求：
-1. 仔细阅读题目内容，理解题意
-2. 分析解题思路和方法
-3. 给出详细的解答步骤
-4. 如果有多种解法，请一并说明
-5. 指出常见的错误和注意事项`;
+【最重要的一条】
+**不要重述、不要转录题目原文。** 直接从「答案」开始给出解答。
+如果图片里有多道题，请**逐题解答并保留题号**（如「第1题」「第2题」）；
+只有一道题时就直接解这一道。
+
+解答要求：
+1. 先给**明确答案**（选择题给出选项字母），再给解析
+2. 写出关键步骤与所用知识点/公式
+3. 一题多解时简要列出其他思路
+4. 指出易错点
+5. 题目若模糊不清，说明你的理解后再作答；不要靠臆测补齐`;
 
     // 注入 OCR 识别结果
+    //
+    // ⚠️ 定位：**辅助参考，不是唯一依据**。OCR 对公式、上下标、图表的还原
+    //    经常出错（实测出现过 LaTeX 转义乱码）。必须明确告诉模型以图片为准，
+    //    否则它会照着错误的 OCR 文本作答。
     if (ocrMeta) {
-      systemPrompt += `\n\n【识别到的题目内容】\n${ocrMeta.question}`;
+      systemPrompt += `\n\n【OCR 辅助文本（仅供参考，可能有识别错误）】`
+        + `\n以下文字由 OCR 从图片中提取，**可能存在公式或符号错误**。`
+        + `请以图片内容为准；若文字与图片不符，以图片为准。\n`
+        + ocrMeta.question;
       if (ocrMeta.answer) {
-        systemPrompt += `\n\n【参考答案/解析】\n${ocrMeta.answer}`;
+        systemPrompt += `\n\n【参考答案（可能不完整）】\n${ocrMeta.answer}`;
       }
       if (ocrMeta.subject) {
         systemPrompt += `\n【科目】${ocrMeta.subject}`;
@@ -320,11 +344,20 @@ modeRegistry.register('analysis', {
   },
 
   /**
-   * 获取启用的工具列表
-   * 分析模式启用知识库检索
+   * 获取启用的工具列表。
+   *
+   * ## 为什么必须包含 'memory'（E5 修复）
+   * 用户反馈「记忆没有自动提取」。排查发现：`TauriAdapter.ts:5366` 用
+   * `modeEnabledTools.includes('memory')` 决定是否把 `memory_enabled` 传给后端，
+   * 而后端 `trigger_auto_memory_extraction` 在 `memory_enabled == Some(false)`
+   * 时**直接跳过**（`persistence.rs:1477`）。
+   *
+   * 本模式此前只返回 `['rag']`，于是拍题链路上的记忆开关恒为 false，
+   * 自动提取永远不触发。而拍题恰恰是最该沉淀记忆的场景——它直接暴露
+   * 用户的知识薄弱点。
    */
   getEnabledTools: (_store: ChatStore): string[] => {
-    return ['rag'];
+    return ['rag', 'memory'];
   },
 
   /**
@@ -432,8 +465,12 @@ async function autoSendFirstMessage(
       console.log('[Analysis Mode] Added context ref:', resourceResult.resourceId);
     }
 
-    // 发送分析请求（不再需要 attachments 参数）
-    await store.sendMessage('请分析这道题目');
+    // 发送解答请求。
+    //
+    // ⚠️ 措辞很关键（E5）：原为「请分析这道题目」——「分析」一词容易被模型
+    //    理解为「解析图片内容」而非「解答题目」，实测在整页多题时退化为转录。
+    //    改为明确的「解答」并提示可能多题，与 buildSystemPrompt 的约束呼应。
+    await store.sendMessage('请解答图片中的题目（可能有多道，请逐题作答，不要重述题目原文）');
   } catch (error: unknown) {
     // 如果发送失败，重置标记以允许重试
     store.updateModeState({ autoMessageSent: false });

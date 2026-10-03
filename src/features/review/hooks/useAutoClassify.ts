@@ -31,6 +31,15 @@ export interface UseAutoClassifyParams {
   isComplete: boolean;
   question: string | null | undefined;
   answer: string | null | undefined;
+  /**
+   * 用户当前已有的标签（归类时的**首选池**）。
+   *
+   * E5：归类改为三层优先级（用户已有标签 > 体系固定项 > 才允许新增），
+   * 故必须把用户现有标签传下去，否则模型会另造新词、标签库无限膨胀。
+   */
+  userTags?: readonly string[];
+  /** 本会话已打过的标签（去重，避免重复 IPC） */
+  existingTags?: readonly string[];
   /** 总开关；false 时完全不动作（便于测试与将来的设置项） */
   enabled?: boolean;
 }
@@ -49,6 +58,8 @@ export function useAutoClassify({
   isComplete,
   question,
   answer,
+  userTags = [],
+  existingTags = [],
   enabled = true,
 }: UseAutoClassifyParams): UseAutoClassifyResult {
   const [isClassifying, setIsClassifying] = useState(false);
@@ -57,6 +68,19 @@ export function useAutoClassify({
 
   const classifiedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
+
+  /**
+   * 用 ref 镜像 userTags / existingTags，**不进 effect 依赖**。
+   *
+   * 原因：这两个是数组，父组件每次渲染都可能传入新引用。若写成依赖，
+   * effect 会因引用变化反复执行（虽然 classifiedRef 挡住了重复归类，
+   * 但每次都会重算依赖并可能触发多余的渲染/日志）。
+   * 归类是「读一次当下值」的语义，用 ref 取最新值即可。
+   */
+  const userTagsRef = useRef<readonly string[]>(userTags);
+  userTagsRef.current = userTags;
+  const existingTagsRef = useRef<readonly string[]>(existingTags);
+  existingTagsRef.current = existingTags;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -100,6 +124,8 @@ export function useAutoClassify({
           sessionId,
           question: question ?? '',
           answer: answer ?? '',
+          userTags: userTagsRef.current,
+          existingTags: existingTagsRef.current,
         });
         if (cancelled || !mountedRef.current) return;
         setAppliedTags(tags);

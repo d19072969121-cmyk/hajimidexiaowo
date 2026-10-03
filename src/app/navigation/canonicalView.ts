@@ -52,6 +52,10 @@ const BASE_CANONICAL_VIEWS: CurrentView[] = [
   'practice-hub',
   // E4：拍题页。study Tab 的落地视图，是「拍题 → 解析 → 错题 → 复习」链路的起点。
   'capture',
+  // E5：知识卡片 / 易错点。此前二者共用 flashcards 界面（用户要求分开），
+  // 现各自独立成页，故须登记进 canonical，否则会被静默落回 chat-v2。
+  'knowledge-cards',
+  'weak-points',
 ];
 
 const DEV_ONLY_VIEWS: CurrentView[] = ['crepe-demo', 'chat-v2-test', 'llm-playground'];

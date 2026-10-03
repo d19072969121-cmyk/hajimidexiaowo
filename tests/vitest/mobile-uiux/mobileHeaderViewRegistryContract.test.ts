@@ -62,6 +62,8 @@ const VIEW_REGISTRY_FILES: Record<string, string> = {
   'review-hub': 'src/features/review/pages/ReviewHubPage.tsx',
   'practice-hub': 'src/features/practice/pages/PracticeHubPage.tsx',
   'capture': 'src/features/capture/pages/CapturePage.tsx',
+  'knowledge-cards': 'src/features/review/pages/KnowledgeCardsPage.tsx',
+  'weak-points': 'src/features/review/pages/WeakPointsPage.tsx',
 };
 
 /** MobileHeaderContext 的 JSDoc 里有 useMobileHeader('settings', ...) 等示例注释，排除该文件 */

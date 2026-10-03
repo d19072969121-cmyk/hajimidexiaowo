@@ -750,7 +750,9 @@
     "analysis_result": "Analysis Result",
     "review_hub": "Review",
     "practice_hub": "Practice",
-    "capture": "Capture"
+    "capture": "Capture",
+    "knowledge_cards": "Knowledge Cards",
+    "weak_points": "Weak Points"
   },
   "time": {
     "now": "Just now",
@@ -4022,7 +4024,9 @@
     "filterEmpty": "No mistakes match the filter",
     "noMistakes": "No mistakes yet — try capturing a question",
     "mistakePreview": "Mistakes",
-    "loadFailed": "Failed to load mistakes: {{msg}}"
+    "loadFailed": "Failed to load mistakes: {{msg}}",
+    "searchTags": "Search tags…",
+    "noTagMatch": "No matching tags"
   },
   "capture": {
     "title": "Capture",
@@ -4036,5 +4040,20 @@
     "submit": "Analyze",
     "submitting": "Analyzing…",
     "emptyHint": "Take or pick a photo of the question; AI will recognize and explain it"
+  },
+  "knowledgeCards": {
+    "title": "Knowledge Cards",
+    "searchHint": "Search a fact…",
+    "emptyTitle": "No knowledge cards yet",
+    "emptyDesc": "Jot down small facts as cards and look them up anytime",
+    "new": "New card",
+    "openReview": "Go to spaced repetition review"
+  },
+  "weakPoints": {
+    "title": "Weak Points",
+    "searchHint": "Search cause or subject…",
+    "autoHint": "While grading mistakes, AI records the cause here automatically. You can also add your own.",
+    "noMatch": "No matching cause",
+    "new": "Add a weak point"
   }
 }

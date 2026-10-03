@@ -87,16 +87,25 @@ export function useSidebarSessionData(): SidebarSessionData {
 
   const refresh = useCallback(async () => {
     const generation = ++refreshGenerationRef.current;
+    // 首页/侧栏的会话列表排除拍题（analysis）会话。
+    //
+    // 拍题会话是真实内容（错题本的来源），但语义上属于「错题本」而非
+    // 「常规对话」，出现在首页会挤占列表且用户难以理解。
+    // 排除规则由**调用方**决定：错题本（useMistakeBook）不传该参数，
+    // 因此仍能查到 analysis 会话。
+    const SIDEBAR_EXCLUDE_MODES = ['analysis'];
     const [groupedResult, ungroupedResult, groupsResult] = await Promise.allSettled([
       invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
         groupId: '*',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
         limit: 10000,
         offset: 0,
       }),
       invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
         groupId: '',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
         limit: SESSION_LIST_PAGE_SIZE,
         offset: 0,
       }),

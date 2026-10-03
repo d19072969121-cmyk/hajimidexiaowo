@@ -24,6 +24,7 @@ import type { StoreApi } from 'zustand';
 
 import type { ChatStore } from '@/features/chat/core/types';
 import { useAutoClassify } from '@/features/review/hooks/useAutoClassify';
+import { useSessionTags } from '@/features/chat/hooks/useSessionTags';
 import { AnalysisResultView } from './AnalysisResultView';
 import { useAnalysisResultData } from './useAnalysisResultData';
 
@@ -63,6 +64,12 @@ export const AnalysisResultPage: React.FC<AnalysisResultPageProps> = ({
 }) => {
   const { data, phase, isStreaming, error, sessionId } = useAnalysisResultData(store);
 
+  // E5：归类需要「用户已有标签」作为首选池（三层优先级的最高层）。
+  // useSessionTags 已在管理全库标签（allTags），直接复用而非另拉一份。
+  const { allTags, tagsBySession } = useSessionTags();
+  const userTags = React.useMemo(() => allTags.map((t) => t.tag), [allTags]);
+  const existingTags = sessionId ? (tagsBySession.get(sessionId) ?? []) : [];
+
   // 自动归类：解析完成后台抽知识点 → 写入会话标签系统。
   // 完成信号 = ready 且有正文且不再流式（isStreaming 已是双证据推导，
   // 见 useAnalysisResultData.ts 的 isMessageBlockActive）。不阻断展示。
@@ -72,6 +79,8 @@ export const AnalysisResultPage: React.FC<AnalysisResultPageProps> = ({
     isComplete: phase === 'ready' && !isStreaming && Boolean(data?.answer),
     question: data?.question ?? null,
     answer: data?.answer ?? null,
+    userTags,
+    existingTags,
     enabled: autoClassifyEnabled,
   });
 

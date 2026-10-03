@@ -71,6 +71,9 @@ const CONTEXTUAL_ENTRY_VIEWS = new Set([
   // E4：拍题页。study Tab 的落地视图（TAB_ROOT_VIEW.study='capture'），
   // 本身就是一格 Tab 的根，不经抽屉/命令面板，故登记在此。
   'capture',
+  // E5：知识卡片 / 易错点。由 review-hub 推入的二级页，同 analysis-result 性质。
+  'knowledge-cards',
+  'weak-points',
 ]);
 
 /** 匹配 view: 'xxx'（含 view: 'xxx' as CurrentView / as NavViewType） */

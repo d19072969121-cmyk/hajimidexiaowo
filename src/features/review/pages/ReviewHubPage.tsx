@@ -19,7 +19,7 @@
  *   会被静默重定向到 `chat-v2`。
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 import {
@@ -42,6 +42,14 @@ export interface ReviewHubPageProps {
   onBack?: () => void;
   /** 导航到某个视图（由宿主注入，复用 App 的 setCurrentView） */
   onNavigate?: (view: CurrentView) => void;
+  /**
+   * 打开某条错题（E5）。
+   *
+   * 宿主负责：把该会话设为当前会话 → 切到解析结果页。
+   * 之所以要宿主做：设置当前会话必须经 ChatV2Page 的包装版
+   * `setCurrentSessionId`（见 E4 拍题链路的教训），页面层拿不到它。
+   */
+  onOpenMistake?: (sessionId: string) => void;
   className?: string;
 }
 
@@ -69,19 +77,21 @@ const HUB_ENTRIES: readonly HubEntry[] = [
     accentClass: 'text-primary',
   },
   {
-    id: 'flashcards',
-    title: '单词卡片',
-    subtitle: '闪卡复习与背诵',
+    id: 'knowledge-cards',
+    title: '知识卡片',
+    subtitle: '记小知识点，随时翻看',
     icon: StudyCardsIcon,
-    view: 'flashcards',
+    // E5：改名 + 独立成页（原「单词卡片」跳 flashcards，与易错点共用界面）
+    view: 'knowledge-cards',
     accentClass: 'text-sky-500',
   },
   {
     id: 'weak-points',
     title: '易错点',
-    subtitle: '按错因归类复盘',
+    subtitle: '按错因复盘，AI 自动沉淀',
     icon: StudyStackIcon,
-    view: 'flashcards',
+    // E5：独立成页（原与知识卡片共用 flashcards 界面）
+    view: 'weak-points',
     accentClass: 'text-amber-500',
   },
   {
@@ -98,6 +108,7 @@ const HUB_ENTRIES: readonly HubEntry[] = [
 export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
   onBack,
   onNavigate,
+  onOpenMistake,
   className,
 }) => {
   const { t } = useTranslation();
@@ -141,6 +152,22 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
     if (selectedFilterTags.size === 0) return withTags;
     return withTags.filter((e) => e.tags.some((tag) => selectedFilterTags.has(tag)));
   }, [entries, tagsBySession, selectedFilterTags]);
+
+  /** 标签搜索关键词（E5）：标签多了以后逐个扫视不现实 */
+  const [tagQuery, setTagQuery] = useState('');
+
+  /**
+   * 按关键词过滤后的标签（供筛选条渲染）。
+   *
+   * - 大小写不敏感的子串匹配（中英文都适用；中文无大小写，等价于 includes）
+   * - 搜索**只影响候选展示**，不影响已选筛选：便于「先点几个、再搜索缩小范围」
+   * - 空关键词时返回全部，保持原有行为
+   */
+  const filteredTags = useMemo(() => {
+    const kw = tagQuery.trim().toLowerCase();
+    if (!kw) return allTags;
+    return allTags.filter(({ tag }) => tag.toLowerCase().includes(kw));
+  }, [allTags, tagQuery]);
 
   const headerTitle = t('reviewHub.title', '复习');
 
@@ -318,14 +345,28 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
                 <li
                   key={item.sessionId}
                   data-testid={`review-hub-mistake-item-${item.sessionId}`}
-                  className="rounded-lg border border-border px-3 py-2"
+                  className="rounded-lg border border-border px-3 py-2 transition-colors hover:bg-accent"
                 >
-                  <div className="flex items-center justify-between">
+                  {/*
+                    条目本体可点开（E5 修复）：
+                    此前整条是个纯 <li>，没有任何点击处理——用户「点 UI 也点不开」，
+                    根本看不到自己錯的是哪道题。
+                    点开目标 = 解析结果页（该错题会话的完整内容：题干 + 解析 + 笔记），
+                    这正是「错题 = mode:'analysis' 的 chat 会话」这一定义的直接体现。
+                    ⚠️ 用 button 包住标题区而非整个 li：下方标签的「×」与「+ 标签」
+                       是独立交互，套在可点容器里会误触。
+                  */}
+                  <button
+                    type="button"
+                    data-testid={`review-hub-open-${item.sessionId}`}
+                    onClick={() => onOpenMistake?.(item.sessionId)}
+                    className="flex w-full items-center justify-between text-left"
+                  >
                     <span className="truncate text-sm text-foreground">{item.title}</span>
                     <span className="ml-2 shrink-0 text-xs text-muted-foreground">
                       {formatDate(item.updatedAt)}
                     </span>
-                  </div>
+                  </button>
                   {/* 标签行：每个标签带删除按钮 = 手动归类（移除）。
                       加标签走下方输入框。 */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1">

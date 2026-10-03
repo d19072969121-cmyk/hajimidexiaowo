@@ -168,6 +168,15 @@ export const LazyCapturePage = React.lazy(() =>
   import('@/features/capture/pages/CapturePage').then(m => ({ default: m.CapturePage }))
 );
 
+// E5：知识卡片（原「单词卡片」改名）与易错点。用户要求二者分开，
+// 此前都复用 flashcards 界面。
+export const LazyKnowledgeCardsPage = React.lazy(() =>
+  import('@/features/review/pages/KnowledgeCardsPage').then(m => ({ default: m.KnowledgeCardsPage }))
+);
+export const LazyWeakPointsPage = React.lazy(() =>
+  import('@/features/review/pages/WeakPointsPage').then(m => ({ default: m.WeakPointsPage }))
+);
+
 // 开发专用组件：生产构建中 import.meta.env.DEV 为 false，动态 import 被 Rollup 死代码消除
 const DevNull: React.FC<any> = () => null;
 const devLazy = () => Promise.resolve({ default: DevNull as React.ComponentType<any> });

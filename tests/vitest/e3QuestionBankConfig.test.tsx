@@ -25,8 +25,21 @@ import {
 // ============================================================================
 
 describe('题库来源预设', () => {
-  it('恰好三个预设：21世纪教育网 / 智学网 / 自定义', () => {
-    expect(QUESTION_BANK_PROVIDERS.map((p) => p.id)).toEqual(['cn21', 'zhixue', 'custom']);
+  it('恰好三个预设：21世纪教育网 / 题庄 / 自定义', () => {
+    // E5：智学网无官方开放平台，已替换为题庄（有正式 API + 匿名试用）
+    expect(QUESTION_BANK_PROVIDERS.map((p) => p.id)).toEqual(['cn21', 'tizhuang', 'custom']);
+  });
+
+  it('题庄预设预填了接口地址（固定值，无需用户手填）', () => {
+    const tz = QUESTION_BANK_PROVIDERS.find((p) => p.id === 'tizhuang')!;
+    const baseUrlField = tz.fields.find((f) => f.key === 'baseUrl')!;
+    expect(baseUrlField.defaultValue).toBe('https://tizhuang.qcscience.cc/api');
+  });
+
+  it('题庄的 License 非必填（留空走匿名试用）', () => {
+    const tz = QUESTION_BANK_PROVIDERS.find((p) => p.id === 'tizhuang')!;
+    const licenseField = tz.fields.find((f) => f.key === 'accessKey')!;
+    expect(licenseField.required).toBeFalsy();
   });
 
   it('21世纪教育网带官方文档地址与沙箱地址', () => {
@@ -202,7 +215,7 @@ describe('QuestionBankApiSection：去配置 / 已配置 状态机', () => {
     fireEvent.click(btn);
 
     expect(screen.getByTestId('question-bank-config-panel')).toBeInTheDocument();
-    for (const id of ['cn21', 'zhixue', 'custom']) {
+    for (const id of ['cn21', 'tizhuang', 'custom']) {
       expect(screen.getByTestId(`question-bank-provider-${id}`)).toBeInTheDocument();
     }
   });

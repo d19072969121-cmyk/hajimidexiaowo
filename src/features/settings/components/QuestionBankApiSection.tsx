@@ -61,8 +61,18 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
     (id: QuestionBankProviderId) => {
       setProvider(id);
       setExpanded(true);
+
+      // 自动填入该来源的默认值（如题庄的固定接口地址）。
+      // 只填**当前为空**的字段——不覆盖用户已输入的内容。
+      const meta = QUESTION_BANK_PROVIDERS.find((p) => p.id === id);
+      const current = config.credentials[id] ?? {};
+      for (const field of meta?.fields ?? []) {
+        if (!field.defaultValue) continue;
+        if ((current[field.key] ?? '').trim().length > 0) continue;
+        setCredential(id, field.key, field.defaultValue);
+      }
     },
-    [setProvider],
+    [setProvider, setCredential, config.credentials],
   );
 
   const handleFillSandbox = useCallback(() => {

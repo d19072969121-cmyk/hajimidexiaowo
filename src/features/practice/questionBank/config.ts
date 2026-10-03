@@ -23,8 +23,14 @@
 export type QuestionBankProviderId =
   /** 21世纪教育网开放平台（有正式文档与沙箱，见 dev.21cnjy.com/docs/api） */
   | 'cn21'
-  /** 智学网。**无官方开放平台**，只能按自定义形态填地址与凭据 */
-  | 'zhixue'
+  /**
+   * 题庄中小学题库（https://tizhuang.qcscience.cc/）。
+   *
+   * 有正式 API：base 为 `/api`；**不填 License 时自动启用 24 小时匿名试用
+   * （100 题额度）**，故用户可零配置先跑通，比需要申请 key 的平台友好。
+   * 登录后可拿到 License，日额度提升（注册免费）。
+   */
+  | 'tizhuang'
   /** 自定义。用户填任意兼容的题库 API */
   | 'custom';
 
@@ -54,6 +60,13 @@ export interface QuestionBankField {
   /** 说明/帮助文本 */
   hint?: string;
   required?: boolean;
+  /**
+   * 默认值。选中该来源且该字段为空时，UI 自动填入。
+   *
+   * 用途：有些平台的接口地址是固定值（如题庄的 `/api`），让用户手填毫无意义
+   * 且容易填错。预填后用户只需在需要升级额度时补 License。
+   */
+  defaultValue?: string;
 }
 
 /**
@@ -91,22 +104,25 @@ export const QUESTION_BANK_PROVIDERS: readonly QuestionBankProviderMeta[] = [
     ],
   },
   {
-    id: 'zhixue',
-    label: '智学网',
-    description: '无官方开放平台，需自备接口地址与凭据',
+    id: 'tizhuang',
+    label: '题庄',
+    description: '2000万+ K12 真题，支持按知识点/章节/难度检索，可匿名试用',
+    docsUrl: 'https://github.com/weishao2/tizhuang-agent-skills/tree/main/skills/question-bank',
     fields: [
       {
         key: 'baseUrl',
         label: '接口地址',
         required: true,
-        placeholder: 'https://...',
-        hint: '智学网未提供官方开放 API，此处仅作自定义接入入口',
+        placeholder: 'https://tizhuang.qcscience.cc/api',
+        hint: '题庄的固定接口地址，已预填，一般无需修改',
+        defaultValue: 'https://tizhuang.qcscience.cc/api',
       },
       {
         key: 'accessKey',
-        label: 'Token / Cookie',
+        label: 'License（可留空）',
         secret: true,
-        placeholder: '按你的接口要求填写',
+        placeholder: '留空则使用匿名试用',
+        hint: '留空时自动启用 24 小时匿名试用（100 题）。到官网免费注册可获得 200 题/日',
       },
     ],
   },

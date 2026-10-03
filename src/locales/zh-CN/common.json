@@ -1153,7 +1153,9 @@
     "analysis_result": "解析结果",
     "review_hub": "复习",
     "practice_hub": "刷题",
-    "capture": "拍题"
+    "capture": "拍题",
+    "knowledge_cards": "知识卡片",
+    "weak_points": "易错点"
   },
   "time": {
     "now": "刚刚",
@@ -4015,7 +4017,9 @@
     "filterEmpty": "没有符合筛选的错题",
     "noMistakes": "还没有错题，去「拍题」试试",
     "mistakePreview": "错题本",
-    "loadFailed": "错题本加载失败：{{msg}}"
+    "loadFailed": "错题本加载失败：{{msg}}",
+    "searchTags": "搜索标签…",
+    "noTagMatch": "没有匹配的标签"
   },
   "capture": {
     "title": "拍题",
@@ -4029,5 +4033,20 @@
     "submit": "开始解析",
     "submitting": "识别中…",
     "emptyHint": "拍下或选择题目照片，AI 会识别并给出解析"
+  },
+  "knowledgeCards": {
+    "title": "知识卡片",
+    "searchHint": "搜索知识点…",
+    "emptyTitle": "还没有知识卡片",
+    "emptyDesc": "把零散的知识点记成卡片，需要时随手翻看",
+    "new": "新建知识卡片",
+    "openReview": "进入间隔重复复习"
+  },
+  "weakPoints": {
+    "title": "易错点",
+    "searchHint": "搜索错因或学科…",
+    "autoHint": "批改错题时，AI 会自动识别错因并沉淀到这里；你也可以手动补充。",
+    "noMatch": "没有匹配的错因",
+    "new": "手动添加易错点"
   }
 }

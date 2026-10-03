@@ -96,6 +96,10 @@ export const VIEW_TO_TABS: Readonly<Record<CurrentView, readonly TabId[]>> = {
   // study 改落 capture 后不再适用于本键本身，但 chat-v2 的双归属保留。
   'capture': ['study'],
 
+  // review：知识卡片与易错点（E5 起分开）。二者都是 review Tab 的二级页。
+  'knowledge-cards': ['review'],
+  'weak-points': ['review'],
+
   // review：制卡产出 → 闪卡消化
   'flashcards': ['review'],
   'task-dashboard': ['review'],

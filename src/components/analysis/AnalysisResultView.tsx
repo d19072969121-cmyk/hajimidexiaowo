@@ -175,13 +175,23 @@ const SectionCard: React.FC<{
 }> = ({ icon, title, testId, children }) => (
   <section
     data-testid={testId}
-    className="rounded-xl border border-border bg-card overflow-hidden"
+    // min-w-0：flex/grid 子项默认 min-width:auto，长内容（公式、长英文串）
+    // 会把容器撑宽而不是换行，在窄屏上表现为「文字溢出/错位」。
+    className="min-w-0 rounded-xl border border-border bg-card overflow-hidden"
   >
     <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
       <span className="text-muted-foreground shrink-0" aria-hidden="true">{icon}</span>
       <h2 className="text-sm font-medium text-foreground">{title}</h2>
     </div>
-    <div className="px-4 py-3">{children}</div>
+    {/*
+      内容区（E5 修复「文字错位」）：
+      - break-words：让超长不可断词串（如 `CHX2∣∣O` 这类被错误转义的化学式、
+        长 URL、连续英文）在容器内换行，而不是溢出后被 overflow-hidden 裁掉。
+      - overflow-x-auto：公式/表格等确实无法换行的块级内容改为横向滚动，
+        而不是被裁断——保证内容可读而非消失。
+      - min-w-0：配合父级 flex/grid，允许本容器收缩到内容宽度以下。
+    */}
+    <div className="min-w-0 break-words px-4 py-3 overflow-x-auto">{children}</div>
   </section>
 );
 

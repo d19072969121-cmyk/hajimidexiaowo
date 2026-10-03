@@ -163,6 +163,8 @@ import {
   LazyReviewHubPage,
   LazyPracticeHubPage,
   LazyCapturePage,
+  LazyKnowledgeCardsPage,
+  LazyWeakPointsPage,
   LazyCrepeDemoPage,
   LazyChatV2IntegrationTest,
   LazyLLMOutputPlayground,
@@ -2675,6 +2677,8 @@ function App() {
       'review-hub': t('common:navigation.review_hub', '复习'),
       'practice-hub': t('common:navigation.practice_hub', '刷题'),
       'capture': t('common:navigation.capture', '拍题'),
+      'knowledge-cards': t('common:navigation.knowledge_cards', '知识卡片'),
+      'weak-points': t('common:navigation.weak_points', '易错点'),
     };
 
     return labels[currentView] ?? t('common:app.default_header');
@@ -3196,7 +3200,25 @@ function App() {
               {renderViewLayer('review-hub', (
                 <Suspense fallback={<PageLoadingFallback />}>
                   <MobilePageScaffold>
-                    <LazyReviewHubPage onNavigate={setCurrentView} />
+                    <LazyReviewHubPage
+                      onNavigate={setCurrentView}
+                      // E5：点开某条错题 → 进该会话的解析结果页。
+                      //
+                      // 顺序与 E4 拍题链路一致（那次踩过坑）：
+                      //   1) 先让 ChatV2Page 知情并切换会话——走既有导航握手
+                      //      事件 `navigate-to-session`（ModernSidebar 等同款用法）。
+                      //      ChatV2Page 的 handler 会调**包装版** setCurrentSessionId，
+                      //      从而驱动 ChatContainer → useTauriAdapter → adapter setup，
+                      //      使该会话的正文（解析内容）真正加载出来。
+                      //      若绕过它直接调 sessionManager，解析页会永久转圈。
+                      //   2) 再切到解析结果页。
+                      onOpenMistake={(sessionId) => {
+                        window.dispatchEvent(new CustomEvent('navigate-to-session', {
+                          detail: { sessionId },
+                        }));
+                        setCurrentView('analysis-result');
+                      }}
+                    />
                   </MobilePageScaffold>
                 </Suspense>
               ))}
@@ -3211,8 +3233,28 @@ function App() {
                       onSubmitImages={captureToAnalysisSession}
                       isSubmitting={isCapturing}
                       error={captureError}
-                      onOpenChat={() => setCurrentView('chat-v2')}
                     />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
+              {/* E5 知识卡片（原「单词卡片」改名）：记小知识点的速查集合。
+                  与易错点分开成页——此前二者共用 flashcards 界面。 */}
+              {renderViewLayer('knowledge-cards', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyKnowledgeCardsPage
+                      onOpenFlashcards={() => setCurrentView('flashcards')}
+                    />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
+              {/* E5 易错点：独立页。AI 批改时自动沉淀 + 本页手动添加。 */}
+              {renderViewLayer('weak-points', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyWeakPointsPage />
                   </MobilePageScaffold>
                 </Suspense>
               ))}

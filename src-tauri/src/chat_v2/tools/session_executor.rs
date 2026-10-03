@@ -201,7 +201,7 @@ impl SessionToolExecutor {
             .clamp(1, 20) as u32;
         let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
-        let sessions = ChatV2Repo::list_sessions_with_conn(&conn, status, group_id, limit, offset)
+        let sessions = ChatV2Repo::list_sessions_with_conn(&conn, status, group_id, None, limit, offset)
             .map_err(|e| e.to_string())?;
         let total = ChatV2Repo::count_sessions_with_conn(&conn, status, group_id)
             .map_err(|e| e.to_string())?;

@@ -496,14 +496,16 @@ pub async fn chat_v2_save_session(
 pub async fn chat_v2_list_sessions(
     status: Option<String>,
     group_id: Option<String>,
+    exclude_modes: Option<Vec<String>>,
     limit: Option<u32>,
     offset: Option<u32>,
     db: State<'_, Arc<ChatV2Database>>,
 ) -> Result<Vec<ChatSession>, String> {
     log::info!(
-        "[ChatV2::handlers] chat_v2_list_sessions: status={:?}, group_id={:?}, limit={:?}, offset={:?}",
+        "[ChatV2::handlers] chat_v2_list_sessions: status={:?}, group_id={:?}, exclude_modes={:?}, limit={:?}, offset={:?}",
         status,
         group_id,
+        exclude_modes,
         limit,
         offset
     );
@@ -511,10 +513,18 @@ pub async fn chat_v2_list_sessions(
     let limit = limit.unwrap_or(50);
     let offset = offset.unwrap_or(0);
 
-    // 从数据库获取会话列表
-    let sessions =
-        ChatV2Repo::list_sessions_v2(&db, status.as_deref(), group_id.as_deref(), limit, offset)
-            .map_err(String::from)?;
+    // 从数据库获取会话列表。
+    // exclude_modes：由调用方决定排除哪些模式——首页传 ['analysis'] 以隐藏拍题会话，
+    // 错题本不传以保留对 analysis 会话的查询能力。
+    let sessions = ChatV2Repo::list_sessions_v2_excluding(
+        &db,
+        status.as_deref(),
+        group_id.as_deref(),
+        exclude_modes.as_deref(),
+        limit,
+        offset,
+    )
+    .map_err(String::from)?;
 
     log::info!(
         "[ChatV2::handlers] Listed {} sessions (offset={})",
