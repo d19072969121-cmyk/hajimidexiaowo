@@ -349,11 +349,14 @@ jobs:
             echo "✅ Downloaded and bundled pdfium for arm64"
           fi
 
-      # ── NDK 工具链：相对上游 :365-379 的三处修正 ──
+      # ── NDK 工具链：相对上游 :365-379 的两处修正 ──
       # 1. 宿主 tag 由 uname 动态解析（上游硬编码 linux-x86_64）。仓库自身
       #    的 scripts/android-ndk-tools.sh 已有正确实现，这里内联等价逻辑。
       # 2. 校验 ELF 架构（上游 test -x 只看可执行位，不校验 e_machine）。
-      # 3. 用 API 21（与 scripts/build_android.sh:702 一致），上游用 API 24。
+      # API 级别取 24，与上游 reusable-build-android.yml:368 及 Gradle
+      # minSdk=24 三方对齐。此前误用 API 21 导致 run 37092196261 失败：
+      # NDK r29 已不再提供 android21 的 clang 驱动（LLVM 已 drop pre-23
+      # workaround），bin/ 下无 aarch64-linux-android21-clang，test -x 失败。
       - name: Configure NDK toolchain
         run: |
           HOST_ARCH="$(uname -m)"
@@ -367,9 +370,12 @@ jobs:
           test -d "$NDK_PREBUILT" \
             || { echo "::error::NDK prebuilt toolchain missing: $NDK_PREBUILT (host=${HOST_ARCH})"; exit 1; }
 
-          for TOOL in aarch64-linux-android21-clang aarch64-linux-android21-clang++ llvm-ar; do
+          for TOOL in aarch64-linux-android24-clang aarch64-linux-android24-clang++ llvm-ar; do
             BIN="${NDK_PREBUILT}/bin/${TOOL}"
             test -x "$BIN" || { echo "::error::missing NDK tool ${TOOL} at ${BIN}"; exit 1; }
+            # 必须是普通文件：NDK 新版 bin/ 下可能混入同名目录/符号链接，
+            # test -x 对目录返回真，会把目录当 ELF 解析并产出空架构，故显式挡住。
+            test -f "$BIN" || { echo "::error::NDK tool ${TOOL} is not a regular file at ${BIN}"; exit 1; }
             # llvm-ar 是多调用二进制，架构校验只对 clang 驱动有意义；但三者
             # 都必须是宿主可执行的 ELF，故统一校验 e_machine 与宿主一致。
             MACHINE="$(readelf -h "$BIN" 2>/dev/null | awk -F: '/Machine:/ {gsub(/^[ \t]+/,"",$2); print $2}')"
@@ -380,13 +386,13 @@ jobs:
           done
 
           {
-            echo "CC_aarch64_linux_android=${NDK_PREBUILT}/bin/aarch64-linux-android21-clang"
-            echo "CXX_aarch64_linux_android=${NDK_PREBUILT}/bin/aarch64-linux-android21-clang++"
+            echo "CC_aarch64_linux_android=${NDK_PREBUILT}/bin/aarch64-linux-android24-clang"
+            echo "CXX_aarch64_linux_android=${NDK_PREBUILT}/bin/aarch64-linux-android24-clang++"
             echo "AR_aarch64_linux_android=${NDK_PREBUILT}/bin/llvm-ar"
-            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${NDK_PREBUILT}/bin/aarch64-linux-android21-clang"
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${NDK_PREBUILT}/bin/aarch64-linux-android24-clang"
           } >> "$GITHUB_ENV"
 
-          echo "✅ NDK toolchain configured: ${NDK_PREBUILT} (host=${HOST_ARCH}, API=21)"
+          echo "✅ NDK toolchain configured: ${NDK_PREBUILT} (host=${HOST_ARCH}, API=24)"
 
       # 与上游 :381-382 同源：复用 tauri 首次原生编译的产物，避免 Gradle 阶段
       # 二次编译 Rust。注意该脚本内部仍硬编码 linux-x86_64，与上面的动态解析
