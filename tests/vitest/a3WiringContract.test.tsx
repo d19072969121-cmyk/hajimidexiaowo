@@ -87,3 +87,25 @@ describe('A3 接线契约：i18n 词条已补齐', () => {
     }
   });
 });
+
+describe('A3 接线契约：五个 Tab 图标必须两两不同', () => {
+  const bar = readFileSync(
+    resolve(process.cwd(), 'src/components/navigation/MobileTabBar.tsx'), 'utf8');
+
+  it('TAB_ICON 表内不出现重复图标组件', () => {
+    const block = bar.match(/const TAB_ICON[\s\S]*?\n\};/)?.[0] ?? '';
+    expect(block, '未找到 TAB_ICON 定义').not.toBe('');
+    const icons = [...block.matchAll(/^\s*\w+:\s*(\w+),/gm)].map(m => m[1]);
+    expect(icons.length).toBe(5);
+    const dup = icons.filter((v, i) => icons.indexOf(v) !== i);
+    expect(dup, `Tab 图标重复：${dup.join(', ')}`).toEqual([]);
+  });
+
+  it('五个 Tab 的图标全部来自 StudySidebarIcons（不混用其它来源）', () => {
+    const block = bar.match(/const TAB_ICON[\s\S]*?\n\};/)?.[0] ?? '';
+    const icons = [...block.matchAll(/^\s*\w+:\s*(\w+),/gm)].map(m => m[1]);
+    for (const ic of icons) {
+      expect(bar).toMatch(new RegExp(`\\b${ic}\\b[\\s\\S]{0,400}?from '@\\/components\\/icons\\/StudySidebarIcons'`));
+    }
+  });
+});

@@ -48,6 +48,7 @@ import {
   StudyCardsIcon,
   StudyChatIcon,
   StudyMagicWandIcon,
+  StudySettingsIcon,
 } from '@/components/icons/StudySidebarIcons';
 import { TAB_IDS, type TabId } from '@/config/tabNavigation';
 import { Z_INDEX } from '@/config/zIndex';
@@ -204,7 +205,9 @@ const TAB_ICON: Record<TabId, React.ElementType> = {
   study: StudyMagicWandIcon,
   review: StudyCardsIcon,
   media: StudyBooksIcon,
-  me: StudyMagicWandIcon,
+  // 注意：me 曾与 study 同用 StudyMagicWandIcon，导致底栏出现重复图案。
+  // 五个 Tab 图标必须两两不同，改动任何一个都要回头核对本表无重。
+  me: StudySettingsIcon,
 };
 
 /**
