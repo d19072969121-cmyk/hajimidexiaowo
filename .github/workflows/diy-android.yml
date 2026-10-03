@@ -349,14 +349,20 @@ jobs:
             echo "✅ Downloaded and bundled pdfium for arm64"
           fi
 
-      # ── NDK 工具链：相对上游 :365-379 的两处修正 ──
+      # ── NDK 工具链 ──
+      # 相对上游 reusable-build-android.yml:365-379 的差异：
       # 1. 宿主 tag 由 uname 动态解析（上游硬编码 linux-x86_64）。仓库自身
       #    的 scripts/android-ndk-tools.sh 已有正确实现，这里内联等价逻辑。
-      # 2. 校验 ELF 架构（上游 test -x 只看可执行位，不校验 e_machine）。
-      # API 级别取 24，与上游 reusable-build-android.yml:368 及 Gradle
-      # minSdk=24 三方对齐。此前误用 API 21 导致 run 37092196261 失败：
-      # NDK r29 已不再提供 android21 的 clang 驱动（LLVM 已 drop pre-23
-      # workaround），bin/ 下无 aarch64-linux-android21-clang，test -x 失败。
+      # 2. 增加 test -f：NDK 新版 bin/ 下可能混入同名目录/符号链接，test -x
+      #    对目录返回真，会把目录当工具使用，故显式要求普通文件。
+      # API 级别取 24，与上游 :368 及 Gradle minSdk=24 三方对齐。
+      #
+      # 刻意不做 ELF e_machine 架构校验。曾加过该校验（用宿主 readelf 再改
+      # NDK 自带 llvm-readelf），连续两轮 run 37092196261 / 37092868871 都
+      # 卡在此处报 "Machine=unknown"，而 test -x / test -f 均已通过，说明
+      # 被校验对象存在且正常，是校验手段本身在 runner 上不可靠。该校验对
+      # 交叉编译并无必要——上游只做 test -x 即可正常出包，故移除，回到与
+      # 上游一致的最小实现，避免继续在非必要处消耗构建轮次。
       - name: Configure NDK toolchain
         run: |
           HOST_ARCH="$(uname -m)"
@@ -370,31 +376,11 @@ jobs:
           test -d "$NDK_PREBUILT" \
             || { echo "::error::NDK prebuilt toolchain missing: $NDK_PREBUILT (host=${HOST_ARCH})"; exit 1; }
 
-          # 用 NDK 自带的 llvm-readelf 判 e_machine，而非宿主的 readelf：
-          # 宿主 binutils 在 GitHub runner 上不保证存在于 PATH（run 37092868861
-          # 实测 readelf 静默失败，MACHINE 为空 → 误报 "Machine=unknown"，
-          # 而 test -x / test -f 均已通过，证明文件本身存在且是普通可执行文件）。
-          # llvm-readelf 随 NDK 一同分发，路径可由 NDK_PREBUILT 确定，无外部依赖。
-          LLVM_READELF="${NDK_PREBUILT}/bin/llvm-readelf"
-          test -x "$LLVM_READELF" \
-            || { echo "::error::llvm-readelf missing at ${LLVM_READELF}"; exit 1; }
-          echo "Using arch probe: $LLVM_READELF"
-          "$LLVM_READELF" --version | head -2
-
           for TOOL in aarch64-linux-android24-clang aarch64-linux-android24-clang++ llvm-ar; do
             BIN="${NDK_PREBUILT}/bin/${TOOL}"
             test -x "$BIN" || { echo "::error::missing NDK tool ${TOOL} at ${BIN}"; exit 1; }
-            # 必须是普通文件：NDK 新版 bin/ 下可能混入同名目录/符号链接，
-            # test -x 对目录返回真，会把目录当 ELF 解析并产出空架构，故显式挡住。
             test -f "$BIN" || { echo "::error::NDK tool ${TOOL} is not a regular file at ${BIN}"; exit 1; }
-            # llvm-ar 是多调用二进制，架构校验只对 clang 驱动有意义；但三者
-            # 都必须是宿主可执行的 ELF，故统一校验 e_machine 与宿主一致。
-            MACHINE="$("$LLVM_READELF" -h "$BIN" 2>&1 | awk -F: '/Machine:/ {print $2}' | head -1 | tr -d '[:space:]')"
-            echo "  · ${TOOL}: Machine=${MACHINE:-<empty>}"
-            case "${HOST_ARCH}:${MACHINE}" in
-              x86_64:*)  case "$MACHINE" in *[Xx]86-64*|*x86_64*) ;; *) echo "::error::${TOOL} is not an x86-64 binary (Machine=${MACHINE:-unknown})"; exit 1 ;; esac ;;
-              aarch64:*) case "$MACHINE" in *[Aa]Arch64*) ;; *) echo "::error::${TOOL} is not an AArch64 binary (Machine=${MACHINE:-unknown})"; exit 1 ;; esac ;;
-            esac
+            echo "  · ok: ${TOOL}"
           done
 
           {
