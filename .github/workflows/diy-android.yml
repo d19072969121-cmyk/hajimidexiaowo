@@ -370,6 +370,17 @@ jobs:
           test -d "$NDK_PREBUILT" \
             || { echo "::error::NDK prebuilt toolchain missing: $NDK_PREBUILT (host=${HOST_ARCH})"; exit 1; }
 
+          # 用 NDK 自带的 llvm-readelf 判 e_machine，而非宿主的 readelf：
+          # 宿主 binutils 在 GitHub runner 上不保证存在于 PATH（run 37092868861
+          # 实测 readelf 静默失败，MACHINE 为空 → 误报 "Machine=unknown"，
+          # 而 test -x / test -f 均已通过，证明文件本身存在且是普通可执行文件）。
+          # llvm-readelf 随 NDK 一同分发，路径可由 NDK_PREBUILT 确定，无外部依赖。
+          LLVM_READELF="${NDK_PREBUILT}/bin/llvm-readelf"
+          test -x "$LLVM_READELF" \
+            || { echo "::error::llvm-readelf missing at ${LLVM_READELF}"; exit 1; }
+          echo "Using arch probe: $LLVM_READELF"
+          "$LLVM_READELF" --version | head -2
+
           for TOOL in aarch64-linux-android24-clang aarch64-linux-android24-clang++ llvm-ar; do
             BIN="${NDK_PREBUILT}/bin/${TOOL}"
             test -x "$BIN" || { echo "::error::missing NDK tool ${TOOL} at ${BIN}"; exit 1; }
@@ -378,10 +389,11 @@ jobs:
             test -f "$BIN" || { echo "::error::NDK tool ${TOOL} is not a regular file at ${BIN}"; exit 1; }
             # llvm-ar 是多调用二进制，架构校验只对 clang 驱动有意义；但三者
             # 都必须是宿主可执行的 ELF，故统一校验 e_machine 与宿主一致。
-            MACHINE="$(readelf -h "$BIN" 2>/dev/null | awk -F: '/Machine:/ {gsub(/^[ \t]+/,"",$2); print $2}')"
+            MACHINE="$("$LLVM_READELF" -h "$BIN" 2>&1 | awk -F: '/Machine:/ {print $2}' | head -1 | tr -d '[:space:]')"
+            echo "  · ${TOOL}: Machine=${MACHINE:-<empty>}"
             case "${HOST_ARCH}:${MACHINE}" in
-              x86_64:*)  case "$MACHINE" in *X86-64*) ;; *) echo "::error::${TOOL} is not an x86-64 binary (Machine=${MACHINE:-unknown})"; exit 1 ;; esac ;;
-              aarch64:*) case "$MACHINE" in *AArch64*) ;; *) echo "::error::${TOOL} is not an AArch64 binary (Machine=${MACHINE:-unknown})"; exit 1 ;; esac ;;
+              x86_64:*)  case "$MACHINE" in *[Xx]86-64*|*x86_64*) ;; *) echo "::error::${TOOL} is not an x86-64 binary (Machine=${MACHINE:-unknown})"; exit 1 ;; esac ;;
+              aarch64:*) case "$MACHINE" in *[Aa]Arch64*) ;; *) echo "::error::${TOOL} is not an AArch64 binary (Machine=${MACHINE:-unknown})"; exit 1 ;; esac ;;
             esac
           done
 
