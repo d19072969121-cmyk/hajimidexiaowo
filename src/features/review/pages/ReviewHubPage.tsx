@@ -19,8 +19,8 @@
  *   会被静默重定向到 `chat-v2`。
  */
 
-import React, { useCallback, useMemo } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 import {
   StudyBooksIcon,
@@ -34,7 +34,8 @@ import { cn } from '@/utils/cn';
 import { useTranslation } from 'react-i18next';
 
 import type { CurrentView } from '@/types/navigation';
-import { useMistakeBook } from '../hooks/useMistakeBook';
+import { useSessionTags } from '@/features/chat/hooks/useSessionTags';
+import { useMistakeBook, type MistakeBookEntryWithTags } from '../hooks/useMistakeBook';
 
 export interface ReviewHubPageProps {
   /** 返回回调；不传则不显示返回箭头（Tab 根页通常不需要） */
@@ -100,6 +101,45 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
 }) => {
   const { t } = useTranslation();
   const { entries, isLoading, error, isLoaded } = useMistakeBook();
+
+  // 归类：标签状态复用 chat 侧现成的 useSessionTags（批量读取 + 增删 + 筛选），
+  // 不在这里另造一套（否则归类 UI 加的标签与错题本副本会不同步）。
+  const {
+    allTags,
+    tagsBySession,
+    loadTagsForSessions,
+    addTag,
+    removeTag,
+    selectedFilterTags,
+    toggleFilterTag,
+    clearFilter,
+  } = useSessionTags();
+
+  // 会话列表就绪后补齐这些会话的标签。依赖 entries 的 id 集合：
+  // entries 每次刷新都是新数组，故用 join 后的字符串做依赖，避免无谓重拉。
+  const sessionIdsKey = useMemo(
+    () => entries.map((e) => e.sessionId).join(','),
+    [entries],
+  );
+
+  useEffect(() => {
+    if (!sessionIdsKey) return;
+    void loadTagsForSessions(sessionIdsKey.split(','));
+  }, [sessionIdsKey, loadTagsForSessions]);
+
+  // 合并标签 + 应用筛选。筛选语义：选中标签间为「或」（任一命中即显示），
+  // 与 chat 侧 SessionBrowser 的 TagFilter 行为一致。
+  //
+  // 标签不在 useMistakeBook 里（会话列表命令不返回 tags），
+  // 由 useSessionTags.tagsBySession 在此合并 —— 见 MistakeBookEntryWithTags 注释。
+  const visibleEntries: MistakeBookEntryWithTags[] = useMemo(() => {
+    const withTags = entries.map((e) => ({
+      ...e,
+      tags: tagsBySession.get(e.sessionId) ?? [],
+    }));
+    if (selectedFilterTags.size === 0) return withTags;
+    return withTags.filter((e) => e.tags.some((tag) => selectedFilterTags.has(tag)));
+  }, [entries, tagsBySession, selectedFilterTags]);
 
   const headerTitle = t('reviewHub.title', '复习');
 
@@ -207,11 +247,54 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
           })}
         </div>
 
-        {/* 错题本预览：本轮做到列表页，故在入口页下方直接给出条目预览 */}
+        {/* 错题本：筛选条 + 条目（标签可增删，即「手动归类」） */}
         <section className="mt-4" data-testid="review-hub-mistake-preview">
-          <h2 className="mb-2 text-xs font-medium text-muted-foreground">
-            {t('reviewHub.mistakePreview', '最近错题')}
-          </h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-xs font-medium text-muted-foreground">
+              {t('reviewHub.mistakePreview', '错题本')}
+            </h2>
+            {selectedFilterTags.size > 0 && (
+              <button
+                type="button"
+                data-testid="review-hub-filter-clear"
+                onClick={clearFilter}
+                className="text-xs text-primary"
+              >
+                {t('reviewHub.clearFilter', '清除筛选')}
+              </button>
+            )}
+          </div>
+
+          {/* 筛选条：只列出现有标签。无标签时不占位（避免空框） */}
+          {allTags.length > 0 && (
+            <div
+              data-testid="review-hub-tag-filter"
+              className="mb-2 flex flex-wrap gap-1.5"
+            >
+              {allTags.map(({ tag, count: tagCount }) => {
+                const active = selectedFilterTags.has(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    data-testid={`review-hub-filter-tag-${tag}`}
+                    data-active={String(active)}
+                    onClick={() => toggleFilterTag(tag)}
+                    className={cn(
+                      'rounded-full border px-2 py-0.5 text-xs transition-colors',
+                      active
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:bg-accent',
+                    )}
+                  >
+                    {tag}
+                    <span className="ml-1 tabular-nums opacity-60">{tagCount}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {isLoading && !isLoaded ? (
             <div
               data-testid="review-hub-mistake-loading"
@@ -219,25 +302,55 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
             >
               {t('reviewHub.loading', '加载中…')}
             </div>
-          ) : entries.length === 0 ? (
+          ) : visibleEntries.length === 0 ? (
             <div
               data-testid="review-hub-mistake-empty"
               className="rounded-lg border border-border px-3 py-4 text-center text-xs text-muted-foreground"
             >
-              {t('reviewHub.noMistakes', '还没有错题，去「拍题」试试')}
+              {entries.length > 0
+                ? t('reviewHub.filterEmpty', '没有符合筛选的错题')
+                : t('reviewHub.noMistakes', '还没有错题，去「拍题」试试')}
             </div>
           ) : (
             <ul className="space-y-1.5">
-              {entries.slice(0, 5).map((item) => (
+              {visibleEntries.slice(0, 20).map((item) => (
                 <li
                   key={item.sessionId}
                   data-testid={`review-hub-mistake-item-${item.sessionId}`}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                  className="rounded-lg border border-border px-3 py-2"
                 >
-                  <span className="truncate text-sm text-foreground">{item.title}</span>
-                  <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                    {formatDate(item.updatedAt)}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="truncate text-sm text-foreground">{item.title}</span>
+                    <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                      {formatDate(item.updatedAt)}
+                    </span>
+                  </div>
+                  {/* 标签行：每个标签带删除按钮 = 手动归类（移除）。
+                      加标签走下方输入框。 */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    {item.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        data-testid={`review-hub-mistake-tag-${item.sessionId}-${tag}`}
+                        className="inline-flex items-center gap-0.5 rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          aria-label={`移除标签 ${tag}`}
+                          data-testid={`review-hub-untag-${item.sessionId}-${tag}`}
+                          onClick={() => void removeTag(item.sessionId, tag)}
+                          className="ml-0.5 opacity-60 hover:opacity-100"
+                        >
+                          <X size={11} aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                    <TagAdder
+                      sessionId={item.sessionId}
+                      onAdd={addTag}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -245,6 +358,64 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
         </section>
       </div>
     </div>
+  );
+};
+
+/**
+ * 单个错题条目的「加标签」控件（手动归类的添加侧）。
+ *
+ * 交互：默认是一个「+ 标签」小按钮，点开变输入框；回车提交、Esc 取消、
+ * 失焦提交。这样列表默认干净，需要归类时才展开。
+ */
+const TagAdder: React.FC<{
+  sessionId: string;
+  onAdd: (sessionId: string, tag: string) => Promise<void>;
+}> = ({ sessionId, onAdd }) => {
+  const [editing, setEditing] = React.useState(false);
+  const [value, setValue] = React.useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = React.useCallback(() => {
+    const tag = value.trim();
+    setValue('');
+    setEditing(false);
+    if (tag) void onAdd(sessionId, tag);
+  }, [value, onAdd, sessionId]);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        data-testid={`review-hub-addtag-${sessionId}`}
+        onClick={() => setEditing(true)}
+        className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+      >
+        + 标签
+      </button>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      data-testid={`review-hub-addtag-input-${sessionId}`}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') {
+          setValue('');
+          setEditing(false);
+        }
+      }}
+      onBlur={commit}
+      placeholder="标签名"
+      className="h-6 w-20 rounded-full border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
+    />
   );
 };
 

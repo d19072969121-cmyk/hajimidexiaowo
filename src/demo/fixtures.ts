@@ -90,13 +90,19 @@ function makeFixture(opts: {
   /** 自动播放的回复剧本（思维链 + 流式输出 + 工具块） */
   reply: DemoBlocks;
   continuations?: DemoFollowUp[];
+  /**
+   * 会话模式。演示默认 'chat'；
+   * 'analysis' 用于让「复习 → 错题本」有可展示的数据
+   * （错题本的筛选口径就是 mode === 'analysis'，见 useMistakeBook.ts）。
+   */
+  mode?: string;
 }): DemoSessionFixture {
   const updatedAt = new Date(Date.now() - opts.minutesAgo * 60_000);
   const createdAt = new Date(updatedAt.getTime() - 10 * 60_000);
   return {
     meta: {
       id: opts.id,
-      mode: 'chat',
+      mode: opts.mode ?? 'chat',
       title: opts.title,
       description: opts.description,
       persistStatus: 'active',
@@ -799,6 +805,56 @@ export const DEMO_SESSIONS: DemoSessionFixture[] = [
   makeFixture({ id: 'demo-bilingual', title: '数据并行训练 · 双语阅读', minutesAgo: 6,
     autoPrompt: `请把下面这段技术材料逐句译成中文，worker 统一译为工作节点，model replica 译为模型副本。生成可复制的双语对照表，并解释关键术语。\n\n${DEMO_TRANSLATION_SOURCE}`, reply: TRANSLATION_REPLY,
     continuations: [{ id: 'terms', label: '继续理解吞吐量与收敛', prompt: '请结合这段材料解释 throughput 和 convergence 的区别。', reply: textReply('**Throughput（吞吐量）**描述单位时间内处理的数据量，例如每秒处理多少训练样本。\n\n**Convergence（收敛）**描述优化过程是否逐渐达到目标，通常结合损失曲线、验证指标和所需训练步数观察。\n\n梯度压缩可能缩短通信时间。评估时应把每步用时与达到目标指标所需的步数一起记录，才能理解一次训练的整体成本。') }],
+  }),
+
+  // ==========================================================================
+  // 错题本演示数据（E2）
+  //
+  // 「复习 → 错题本」的筛选口径是 `mode === 'analysis'`
+  // （见 useMistakeBook.ts）。这里造三条 analysis 会话，让该页有内容可看。
+  //
+  // ⚠️ 刻意**不加入分组**（meta.groupId 不设）——因为错题本取数时不传
+  //    groupId（传 '*' 只会返回已分组的会话，是个已修过的坑）。
+  //    若给这些会话加上 groupId，就测不出「未分组也能显示」这条路径。
+  //
+  // 标签数据在 mockIpc.ts 的 chat_v2_get_tags_batch 里联动提供：
+  // 演示壳没有真实标签库，用 sessionId → tags 的静态表模拟。
+  // ==========================================================================
+  makeFixture({
+    id: 'demo-mistake-quadratic',
+    title: '解一元二次方程 x²-5x+6=0',
+    description: '因式分解法求解，注意判别式与根的关系',
+    minutesAgo: 8,
+    mode: 'analysis',
+    autoPrompt: '解方程 x² - 5x + 6 = 0',
+    reply: [
+      { type: 'thinking', status: 'success', streaming: true, content: '这是一元二次方程，可以用因式分解法。寻找两个数，乘积为 6、和为 -5：-2 与 -3。' },
+      { type: 'content', status: 'success', streaming: false, content: '## 解析\n\n**方程**：x² − 5x + 6 = 0\n\n**解法**：因式分解\n\n把常数项 6 拆成两个因数，使它们的和等于一次项系数 −5：\n\n- (−2) × (−3) = 6\n- (−2) + (−3) = −5\n\n因此：\n\nx² − 5x + 6 = (x − 2)(x − 3) = 0\n\n**结论**：x₁ = 2，x₂ = 3\n\n**验算**：代入 x = 2，得 4 − 10 + 6 = 0 ✓；代入 x = 3，得 9 − 15 + 6 = 0 ✓\n\n**易错点**：因式分解时注意符号。若拆成 2 与 3，则和为 +5，与一次项系数不符。' },
+    ],
+  }),
+  makeFixture({
+    id: 'demo-mistake-fraction',
+    title: '分式方程求解 1/(x-1) = 2/x',
+    description: '去分母后注意验根，排除增根',
+    minutesAgo: 26,
+    mode: 'analysis',
+    autoPrompt: '解方程 1/(x-1) = 2/x',
+    reply: [
+      { type: 'thinking', status: 'success', streaming: true, content: '分式方程先看定义域：x ≠ 1 且 x ≠ 0。然后交叉相乘去分母。' },
+      { type: 'content', status: 'success', streaming: false, content: '## 解析\n\n**方程**：1/(x − 1) = 2/x\n\n**第一步：确定定义域**\n\n分母不为零，因此 x ≠ 1 且 x ≠ 0。\n\n**第二步：交叉相乘**\n\n1 · x = 2 · (x − 1)\n\nx = 2x − 2\n\n**第三步：解得**\n\nx = 2\n\n**第四步：验根**\n\nx = 2 不在定义域排除值 {0, 1} 中，故为有效解。\n\n**结论**：x = 2\n\n**易错点**：分式方程必须验根。忽略定义域时，可能把使分母为零的增根当作有效解保留。' },
+    ],
+  }),
+  makeFixture({
+    id: 'demo-mistake-definite-clause',
+    title: '定语从句关系词选择',
+    description: '区分关系代词与关系副词，判断从句成分',
+    minutesAgo: 51,
+    mode: 'analysis',
+    autoPrompt: '选择：This is the house ___ he lived in last year.',
+    reply: [
+      { type: 'thinking', status: 'success', streaming: true, content: '先看从句缺什么成分。lived in 后面缺宾语，指物，所以用关系代词 which/that。' },
+      { type: 'content', status: 'success', streaming: false, content: '## 解析\n\n**题干**：This is the house ___ he lived in last year.\n\n**判断步骤**\n\n1. 先找先行词：the house（物）\n2. 再看从句：he lived in ___ last year\n3. 从句中 in 后面缺宾语 → 缺**名词性成分**\n\n**规则**\n\n- 从句缺主语或宾语 → 用关系代词（which / that / who）\n- 从句成分完整，缺状语 → 用关系副词（where / when / why）\n\n**答案**：which 或 that（口语中可省略）\n\n**易错点**：见到先行词是「地点」就填 where 是经典错误。这里从句缺的是 in 的宾语，不是地点状语；若改为 he lived ___ last year（无介词），才用 where。' },
+    ],
   }),
 ];
 

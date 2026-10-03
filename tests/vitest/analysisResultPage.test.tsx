@@ -460,4 +460,35 @@ describe('useAnalysisResultData 纯函数', () => {
       }),
     ).not.toThrow();
   });
+
+  it('derive 在所有分支都带响应式 sessionId（供自动归类等消费方使用）', () => {
+    const base = {
+      sessionId: 's1', isDataLoaded: true, sessionStatus: 'idle',
+      lastAssistant: undefined, lastUser: undefined,
+      assistantBlocks: [], userBlocks: [], activeBlockIds: new Set<string>(), modeState: null,
+    };
+
+    // 有会话的各分支应回传该 id
+    expect(deriveAnalysisResultState(base).sessionId).toBe('s1');
+    expect(deriveAnalysisResultState({ ...base, isDataLoaded: false }).sessionId).toBe('s1');
+    expect(
+      deriveAnalysisResultState({
+        ...base,
+        lastAssistant: assistantMsg('a1', ['ab1']),
+        assistantBlocks: [contentBlock('ab1', 'a1', '解析')],
+      }).sessionId,
+    ).toBe('s1');
+
+    // 无会话时为 null（而非空串）
+    expect(deriveAnalysisResultState({ ...base, sessionId: null }).sessionId).toBeNull();
+  });
+
+  it('derive 未传 sessionId 时回 null 而非 undefined', () => {
+    const state = deriveAnalysisResultState({
+      sessionId: undefined, isDataLoaded: true, sessionStatus: 'idle',
+      lastAssistant: undefined, lastUser: undefined,
+      assistantBlocks: [], userBlocks: [], activeBlockIds: new Set<string>(), modeState: null,
+    });
+    expect(state.sessionId).toBeNull();
+  });
 });

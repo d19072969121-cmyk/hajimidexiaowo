@@ -61,6 +61,15 @@ export interface AnalysisResultState {
   error: string | null;
   /** 会话是否已从后端加载完；false 时上层应显示加载态而非空态 */
   isDataLoaded: boolean;
+  /**
+   * 当前会话 id（无会话为 null）。
+   *
+   * 单独暴露是为了让消费方拿到**响应式**的会话标识：直接从
+   * `store.getState().sessionId` 读是非响应式的——store 切换会话时
+   * 组件不会因此重渲染，拿到的是过期值。本字段经 `useStore` 订阅，
+   * 会话变化会正确触发重渲染。
+   */
+  sessionId: string | null;
 }
 
 // ============================================================================
@@ -141,12 +150,12 @@ export function deriveAnalysisResultState(input: {
 
   // ① 无会话 → 空态
   if (!sessionId) {
-    return { data: null, phase: 'empty', isStreaming: false, error: null, isDataLoaded };
+    return { data: null, phase: 'empty', isStreaming: false, error: null, isDataLoaded, sessionId: sessionId ?? null };
   }
 
   // ② 数据未加载完 → 加载态（避免把「还没拉到」误报成「没有」）
   if (!isDataLoaded) {
-    return { data: null, phase: 'loading', isStreaming: streaming, error: null, isDataLoaded };
+    return { data: null, phase: 'loading', isStreaming: streaming, error: null, isDataLoaded, sessionId: sessionId ?? null };
   }
 
   // ③ 无 AI 消息：若仍在流式，说明 AI 消息还没落库 → 加载态；否则空态
@@ -157,6 +166,7 @@ export function deriveAnalysisResultState(input: {
       isStreaming: streaming,
       error: null,
       isDataLoaded,
+      sessionId: sessionId ?? null,
     };
   }
 
@@ -167,6 +177,7 @@ export function deriveAnalysisResultState(input: {
   if (terminalError.length > 0) {
     return {
       data: null, phase: 'error', isStreaming: false, error: terminalError, isDataLoaded,
+      sessionId: sessionId ?? null,
     };
   }
 
@@ -175,7 +186,7 @@ export function deriveAnalysisResultState(input: {
 
   // ⑤ 块级错误且无正文 → 错误态
   if (!answer && blockError) {
-    return { data: null, phase: 'error', isStreaming: false, error: blockError, isDataLoaded };
+    return { data: null, phase: 'error', isStreaming: false, error: blockError, isDataLoaded, sessionId: sessionId ?? null };
   }
 
   // ⑥ 有正文但块报错 → 仍展示正文，错误随 data 带上（不抢占正文）
@@ -192,6 +203,7 @@ export function deriveAnalysisResultState(input: {
       isStreaming: streaming,
       error: blockError,
       isDataLoaded,
+      sessionId: sessionId ?? null,
     };
   }
 
@@ -208,6 +220,7 @@ export function deriveAnalysisResultState(input: {
     isStreaming: streaming && isMessageBlockActive(assistantBlocks, activeBlockIds),
     error: blockError,
     isDataLoaded,
+    sessionId: sessionId ?? null,
   };
 }
 

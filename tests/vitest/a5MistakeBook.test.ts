@@ -12,6 +12,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { toMistakeEntries, ANALYSIS_MODE } from '@/features/review/hooks/useMistakeBook';
 import type { ChatSession } from '@/features/chat/types/session';
@@ -85,9 +87,26 @@ describe('toMistakeEntries：错题筛选口径', () => {
     expect(entries.map((e) => e.sessionId)).toEqual(['ok']);
   });
 
-  it('tags 当前恒为空数组（列表命令不回传 tags，不臆造归类数据）', () => {
+  it('条目类型不含 tags —— 标签由 useSessionTags 在 UI 层合并', () => {
+    // MistakeBookEntry 刻意不带 tags：会话列表命令不返回标签，
+    // 若在这里填 [] 会造出「永远为空的陷阱字段」（消费方会以为「这题没标签」）。
+    // 标签类型是 MistakeBookEntryWithTags，由 UI 层合并得到。
     const entries = toMistakeEntries([session({ id: 'a1', mode: ANALYSIS_MODE })]);
-    expect(entries[0].tags).toEqual([]);
+    expect(entries[0]).not.toHaveProperty('tags');
+  });
+
+  it('取数时不传 groupId —— 传 "*" 会只返回已分组的会话（错题本会近乎永远为空）', async () => {
+    // 后端语义（chat_v2/repo.rs:592-598）：
+    //   None → 不过滤；'*' → 只返回 group_id IS NOT NULL 的
+    // 这是一条**易被误改的契约**：上游侧栏代码里到处是 groupId:'*'，
+    // 照抄过来就会丢数据。故用源码级断言把它钉住。
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/features/review/hooks/useMistakeBook.ts'),
+      'utf8',
+    );
+    const listCall = source.match(/chat_v2_list_sessions[\s\S]{0,300}?\}\)/)?.[0] ?? '';
+    expect(listCall, '未找到 chat_v2_list_sessions 调用').not.toBe('');
+    expect(listCall).not.toMatch(/groupId/);
   });
 
   it('空输入返回空数组', () => {

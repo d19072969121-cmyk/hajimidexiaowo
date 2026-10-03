@@ -71,6 +71,31 @@ const CODE_FILE_PATTERN = /\.(ts|tsx|js|jsx)$/;
 /** 容忍 useMobileHeader(\n  'viewId' 的换行写法（如 TodoContentView） */
 const USE_MOBILE_HEADER_LITERAL = /useMobileHeader\(\s*'([a-z0-9-]+)'/g;
 
+/**
+ * 全仓扫描结果缓存。
+ *
+ * 为什么需要：`listFiles('src') + readSource` 要对整个 src 目录递归读盘。
+ * 在测试进程内并行度较高时（vitest 多个文件并行），这套同步 IO 会被
+ * 拖到超过默认 5s 超时，产生**假红**——单文件跑时 2s 就能过。
+ * 缓存后同进程内只扫一次，避免同一份数据被重复读取放大开销。
+ *
+ * 不跨进程共享（模块级变量），因此不会读到过期数据：每次 test run 都是新进程。
+ */
+let scannedCalls: Array<{ file: string; viewId: string }> | null = null;
+
+function scanMobileHeaderCalls(): Array<{ file: string; viewId: string }> {
+  if (scannedCalls) return scannedCalls;
+  const found: Array<{ file: string; viewId: string }> = [];
+  for (const file of listFiles('src')) {
+    if (!CODE_FILE_PATTERN.test(file) || SCAN_EXCLUDED_FILES.has(file)) continue;
+    for (const match of readSource(file).matchAll(USE_MOBILE_HEADER_LITERAL)) {
+      found.push({ file, viewId: match[1] });
+    }
+  }
+  scannedCalls = found;
+  return found;
+}
+
 describe('mobile header view registry contract', () => {
   const currentViews = parseCurrentViews();
 
@@ -92,16 +117,13 @@ describe('mobile header view registry contract', () => {
     expect(missing).toEqual([]);
   });
 
+  // ⏱️ 显式超时 30s：本用例要递归遍历整个 src 目录并读取每个源码文件，
+  // 是纯同步 IO。测得的正常耗时约 1.6-2.1s，但在 vitest 并行跑多个测试文件时
+  // （进程 CPU 被抢），会超过默认 5s 而**假红**——单文件跑必然通过。
+  // 这是测试基建的资源配置，不是被测逻辑的问题；不要把超时调小。
   it('only ever passes CurrentView literals to useMobileHeader across src', () => {
     const viewSet = new Set(currentViews);
-    const found: Array<{ file: string; viewId: string }> = [];
-
-    for (const file of listFiles('src')) {
-      if (!CODE_FILE_PATTERN.test(file) || SCAN_EXCLUDED_FILES.has(file)) continue;
-      for (const match of readSource(file).matchAll(USE_MOBILE_HEADER_LITERAL)) {
-        found.push({ file, viewId: match[1] });
-      }
-    }
+    const found = scanMobileHeaderCalls();
 
     // 防空断言：全仓至少要能扫到一批真实注册调用，扫描本身失效时直接红
     expect(found.length).toBeGreaterThanOrEqual(10);
@@ -113,7 +135,7 @@ describe('mobile header view registry contract', () => {
       .map(({ file, viewId }) => `${file} 使用了非法 viewId '${viewId}'`);
 
     expect(violations).toEqual([]);
-  });
+  }, 30_000);
 
   it('keeps an App.tsx fallback label entry for every CurrentView', () => {
     const appSource = readSource('src/App.tsx');

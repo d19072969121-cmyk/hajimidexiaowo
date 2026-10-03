@@ -79,7 +79,44 @@ const sessionDb = new Map<string, DemoSessionRecord>(
   ]),
 );
 
+// ============================================================================
+// 演示壳标签与自动归类（E2）
+// ============================================================================
+
+/**
+ * 「会话 → 标签」内存表。
+ *
+ * 三条错题会话（见 fixtures.ts 的 mode:'analysis' 条目）预置标签，
+ * 让「复习 → 错题本」的分类筛选一打开就有内容。
+ * 用户在界面上的增删会改这张表，刷新页面后重置回初值。
+ */
+const demoTagsBySession = new Map<string, string[]>([
+  ['demo-mistake-quadratic', ['一元二次方程', '因式分解']],
+  ['demo-mistake-fraction', ['分式方程', '验根']],
+  ['demo-mistake-definite-clause', ['定语从句', '英语语法']],
+]);
+
 let createSeq = 0;
+
+/**
+ * 演示用的「抽知识点」：按提示词里的关键词返回固定标签。
+ *
+ * ⚠️ 这不是真实推理，只保证 `call_llm_for_boundary` 这条链路可跑通、
+ *    UI 有反馈。真后端走 `call_model2_raw_prompt` 由模型实际抽取。
+ */
+function demoGuessTags(prompt: string): string[] {
+  if (prompt.includes('一元二次') || prompt.includes('因式分解') || prompt.includes('x²')) {
+    return ['一元二次方程', '因式分解'];
+  }
+  if (prompt.includes('分式') || prompt.includes('分母')) {
+    return ['分式方程', '验根'];
+  }
+  if (prompt.includes('定语从句') || prompt.includes('关系词')) {
+    return ['定语从句', '英语语法'];
+  }
+  return ['待归类'];
+}
+
 
 function touch(meta: SessionInfo & { groupId?: string | null }): void {
   meta.updatedAt = new Date().toISOString();
@@ -603,6 +640,64 @@ export function installDemoIpcMocks(): void {
           };
         case 'chat_v2_update_group':
           return null;
+
+        // ====================================================================
+        // 标签命令（E2 复习→错题本 归类用）
+        //
+        // 演示壳没有真实标签库，用内存 Map 模拟「会话 → 标签」。
+        // 初值给三条错题会话各打上标签，让分类筛选一打开就有东西可点；
+        // 之后用户在界面上增删标签，改动会保留在本次会话内（刷新页面重置）。
+        // ====================================================================
+        case 'chat_v2_get_tags_batch': {
+          const ids = Array.isArray(args.sessionIds) ? (args.sessionIds as string[]) : [];
+          const out: Record<string, string[]> = {};
+          for (const sid of ids) {
+            const tags = demoTagsBySession.get(sid);
+            if (tags && tags.length > 0) out[sid] = [...tags];
+          }
+          return out;
+        }
+        case 'chat_v2_get_session_tags': {
+          const sid = String(args.sessionId ?? '');
+          return [...(demoTagsBySession.get(sid) ?? [])];
+        }
+        case 'chat_v2_list_all_tags': {
+          // 返回 [tag, count][] —— 与真后端签名一致（search_handlers.rs:150）
+          const counts = new Map<string, number>();
+          for (const tags of demoTagsBySession.values()) {
+            for (const t of tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+          }
+          return [...counts.entries()];
+        }
+        case 'chat_v2_add_tag': {
+          const sid = String(args.sessionId ?? '');
+          const tag = String(args.tag ?? '').trim();
+          if (!sid || !tag) return null;
+          const existing = demoTagsBySession.get(sid) ?? [];
+          if (!existing.includes(tag)) {
+            demoTagsBySession.set(sid, [...existing, tag]);
+          }
+          return null;
+        }
+        case 'chat_v2_remove_tag': {
+          const sid = String(args.sessionId ?? '');
+          const tag = String(args.tag ?? '');
+          const existing = demoTagsBySession.get(sid) ?? [];
+          demoTagsBySession.set(sid, existing.filter((t) => t !== tag));
+          return null;
+        }
+
+        // ====================================================================
+        // 自动归类用的通用 LLM 命令（E2）
+        //
+        // 真后端是 call_model2_raw_prompt；演示壳里按提示词里的关键词
+        // 返回一组固定知识点标签，用来演示「解析完成后台自动归类」的效果。
+        // 不是真实推理，只保证链路可跑通、UI 有反馈。
+        // ====================================================================
+        case 'call_llm_for_boundary': {
+          const prompt = String(args.prompt ?? '');
+          return { assistant_message: JSON.stringify(demoGuessTags(prompt)) };
+        }
 
         default:
           if (cmd.startsWith('qbank_')) return handleDemoQuestionBank(cmd, args);
