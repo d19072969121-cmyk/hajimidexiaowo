@@ -44,6 +44,10 @@ const BASE_CANONICAL_VIEWS: CurrentView[] = [
   // A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 的中间环节）
   // 必须登记在此，否则 canonicalizeView 会把 'analysis-result' 静默落回 'chat-v2'
   'analysis-result',
+  // A5：复习入口页（错题本 / 单词卡片 / 易错点 / 刷题）
+  // 注意命名：不能叫 'review'——DEPRECATED_VIEW_MAP 里 'review' 是历史废弃
+  // 视图名，会被 canonicalizeView 静默重定向到 'chat-v2'。
+  'review-hub',
 ];
 
 const DEV_ONLY_VIEWS: CurrentView[] = ['crepe-demo', 'chat-v2-test', 'llm-playground'];

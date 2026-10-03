@@ -150,6 +150,13 @@ export const LazyAnalysisResultPage = React.lazy(() =>
   import('@/components/analysis/AnalysisResultPage').then(m => ({ default: m.AnalysisResultPage }))
 );
 
+// A5：复习入口页（错题本 / 单词卡片 / 易错点 / 刷题 四入口）。
+// 视图 id 用 review-hub 而非 review——后者在 canonicalView.ts 的
+// DEPRECATED_VIEW_MAP 里是历史废弃视图名，会被静默重定向到 chat-v2。
+export const LazyReviewHubPage = React.lazy(() =>
+  import('@/features/review/pages/ReviewHubPage').then(m => ({ default: m.ReviewHubPage }))
+);
+
 // 开发专用组件：生产构建中 import.meta.env.DEV 为 false，动态 import 被 Rollup 死代码消除
 const DevNull: React.FC<any> = () => null;
 const devLazy = () => Promise.resolve({ default: DevNull as React.ComponentType<any> });

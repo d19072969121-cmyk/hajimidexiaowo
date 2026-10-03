@@ -55,7 +55,9 @@ export const TAB_ORDER: readonly TabId[] = TAB_IDS;
 export const TAB_ROOT_VIEW: Readonly<Record<TabId, CurrentView>> = {
   home: 'chat-v2',
   study: 'chat-v2',
-  review: 'flashcards',
+  // A5：复习 Tab 不再直接落 flashcards（那只覆盖「单词卡片」一项），
+  // 改为落复习入口页，由它分发到错题本 / 单词卡片 / 易错点 / 刷题。
+  review: 'review-hub',
   media: 'learning-hub',
   me: 'settings',
 } as const;
@@ -91,6 +93,8 @@ export const VIEW_TO_TABS: Readonly<Record<CurrentView, readonly TabId[]>> = {
   // review：制卡产出 → 闪卡消化
   'flashcards': ['review'],
   'task-dashboard': ['review'],
+  // A5：复习入口页（错题本 / 单词卡片 / 易错点 / 刷题）
+  'review-hub': ['review'],
 
   // media：知识资源与文档阅读
   'learning-hub': ['media'],

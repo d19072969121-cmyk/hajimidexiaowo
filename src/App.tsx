@@ -122,6 +122,7 @@ import { useIsUILabEnabled } from './utils/uiLabToggle';
 import { sessionManager } from './features/chat/core/session/sessionManager';
 import { GoalStatusChip } from './features/chat/components/GoalStatusChip';
 import { setSessionSidebarViewContext } from './features/chat/hooks/useSessionSidebarIndicators';
+import { useActiveChatStore } from './features/chat/hooks/useActiveChatStore';
 import { groupCache } from './features/chat/core/store/groupCache';
 import { getSessionTitleText } from './features/chat/utils/sessionTitle';
 import type { ChatStore } from './features/chat/core/types';
@@ -158,6 +159,7 @@ import {
   LazyTodoPage,
   LazyFlashcardsPage,
   LazyAnalysisResultPage,
+  LazyReviewHubPage,
   LazyCrepeDemoPage,
   LazyChatV2IntegrationTest,
   LazyLLMOutputPlayground,
@@ -1152,6 +1154,13 @@ function App() {
   useEffect(() => {
     isSmallScreenRef.current = isSmallScreen;
   }, [isSmallScreen]);
+
+  // A4-P0 地基：解析结果页需要的「当前会话 Store」。
+  // 此前 App.tsx 挂 LazyAnalysisResultPage 时没传 store，容器内 store 默认为
+  // null → useAnalysisResultData 永远走「无会话 → 空态」分支，页面打开即空白。
+  // 这里用响应式桥接 hook 取当前会话 store（只读不创建）；解析会话创建后
+  // sessionManager 会发 session-created，hook 重取，页面自然从空态过渡到内容态。
+  const analysisResultStore = useActiveChatStore();
 
   // 包装 setCurrentView，添加视图切换追踪 + LRU 淘汰
   const setCurrentView = useCallback((newView: CurrentView | ((prev: CurrentView) => CurrentView)) => {
@@ -2606,6 +2615,7 @@ function App() {
       'chat-v2-test': t('common:navigation.chat_v2_test'),
       'llm-playground': t('common:navigation.llm_playground'),
       'analysis-result': t('common:navigation.analysis_result'),
+      'review-hub': t('common:navigation.review_hub', '复习'),
     };
 
     return labels[currentView] ?? t('common:app.default_header');
@@ -3114,7 +3124,20 @@ function App() {
               {renderViewLayer('analysis-result', (
                 <Suspense fallback={<PageLoadingFallback />}>
                   <MobilePageScaffold>
-                    <LazyAnalysisResultPage onBack={() => setCurrentView('chat-v2')} />
+                    <LazyAnalysisResultPage
+                      store={analysisResultStore}
+                      onBack={() => setCurrentView('chat-v2')}
+                    />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
+              {/* A5 复习入口页：错题本 / 单词卡片 / 易错点 / 刷题。
+                  review Tab 的落地视图（TAB_ROOT_VIEW.review = 'review-hub'）。 */}
+              {renderViewLayer('review-hub', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyReviewHubPage onNavigate={setCurrentView} />
                   </MobilePageScaffold>
                 </Suspense>
               ))}

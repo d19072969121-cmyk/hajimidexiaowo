@@ -25,7 +25,8 @@ export type CurrentView =
   | 'flashcards'        // 闪卡复习（传统壳入口；OS 模式仍走学习桌面应用）
   | 'chat-v2-test'      // Chat V2 集成测试页面（开发用）
   | 'llm-playground'    // LLM 输出模拟游乐场（开发用）
-  | 'analysis-result';  // A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 中间环节）
+  | 'analysis-result'   // A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 中间环节）
+  | 'review-hub';       // A5：复习入口页（错题本 / 单词卡片 / 易错点 / 刷题 四入口）
 
 /**
  * 导航历史项：包含视图、参数和状态恢复函数

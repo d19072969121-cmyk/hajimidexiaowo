@@ -59,6 +59,7 @@ const VIEW_REGISTRY_FILES: Record<string, string> = {
   'chat-v2-test': 'src/features/chat/dev/IntegrationTest.tsx',
   'llm-playground': 'src/features/chat/dev/playground/LLMOutputPlayground.tsx',
   'analysis-result': 'src/components/analysis/AnalysisResultView.tsx',
+  'review-hub': 'src/features/review/pages/ReviewHubPage.tsx',
 };
 
 /** MobileHeaderContext 的 JSDoc 里有 useMobileHeader('settings', ...) 等示例注释，排除该文件 */
