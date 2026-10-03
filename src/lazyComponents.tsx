@@ -143,6 +143,13 @@ export const LazyFlashcardsPage = React.lazy(() =>
   import('@/features/flashcards/FlashcardsApp').then(m => ({ default: m.FlashcardsApp }))
 );
 
+// A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 的中间环节）。
+// 定位见 src/components/analysis/AnalysisResultPage.tsx 头部注释：
+// 上游无独立解析页，本视图是 chat 会话的特殊展示态，属 study tab。
+export const LazyAnalysisResultPage = React.lazy(() =>
+  import('@/components/analysis/AnalysisResultPage').then(m => ({ default: m.AnalysisResultPage }))
+);
+
 // 开发专用组件：生产构建中 import.meta.env.DEV 为 false，动态 import 被 Rollup 死代码消除
 const DevNull: React.FC<any> = () => null;
 const devLazy = () => Promise.resolve({ default: DevNull as React.ComponentType<any> });

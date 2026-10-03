@@ -42,6 +42,13 @@ export const APP_EVENTS = {
   MODERN_SIDEBAR_GROUP_ACTION: 'modern-sidebar:group-action',
   MOBILE_APP_NAVIGATE: 'deepstudent:mobile-sidebar-navigate',
   CHAT_NEW_SESSION: 'CHAT_NEW_SESSION',
+  /**
+   * A3-P0：解析会话创建完成。由 chat 层 dispatch（载荷 { sessionId, imageCount }），
+   * App 层监听后把视图切到 'analysis-result'（解析结果全屏视图）。
+   * 为什么走事件而不是 props 透传：视图状态归 App 层，chat 层不持有导航能力，
+   * 与既有 MOBILE_APP_NAVIGATE / OPEN_* 系列同一模式。
+   */
+  ANALYSIS_SESSION_CREATED: 'chat-v2:analysis-session-created',
   NOTES_CREATE_NEW: 'NOTES_CREATE_NEW',
   NAVIGATE_TO_EXAM_SHEET: 'navigateToExamSheet',
   NAVIGATE_TO_TRANSLATION: 'navigateToTranslation',
@@ -196,6 +203,12 @@ export interface WbPreviewQuickLookDetail {
   toggle?: boolean;
 }
 
+/** A3-P0：解析会话创建完成的载荷 */
+export interface AnalysisSessionCreatedDetail {
+  sessionId: string;
+  imageCount: number;
+}
+
 export interface AppEventPayloads {
   [APP_EVENTS.SYSTEM_SETTINGS_CHANGED]: SystemSettingsChangedDetail;
   [APP_EVENTS.WORKBENCH_MODE_CHANGED]: WorkbenchModeChangedDetail;
@@ -224,6 +237,8 @@ export interface AppEventPayloads {
   [APP_EVENTS.MOBILE_APP_NAVIGATE]: MobileAppNavigateDetail;
   /** 命令面板新建会话；侧栏 group-action 复用时可带 action */
   [APP_EVENTS.CHAT_NEW_SESSION]: ModernSidebarGroupActionDetail | undefined;
+  /** A3-P0：拍题解析会话创建完成（App 层据此切到 analysis-result 视图） */
+  [APP_EVENTS.ANALYSIS_SESSION_CREATED]: AnalysisSessionCreatedDetail;
   [APP_EVENTS.NOTES_CREATE_NEW]: void;
   [APP_EVENTS.NAVIGATE_TO_EXAM_SHEET]: NavigateToExamSheetDetail;
   [APP_EVENTS.NAVIGATE_TO_TRANSLATION]: NavigateToTranslationDetail;

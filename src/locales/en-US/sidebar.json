@@ -56,6 +56,14 @@
       "task_dashboard": "Cards",
       "flashcards": "Review",
       "data_management": "Data"
+    },
+    "tabs": {
+      "aria_label": "Primary navigation",
+      "home": "Home",
+      "study": "Snap",
+      "review": "Review",
+      "media": "Library",
+      "me": "Me"
     }
   },
   "aria": {

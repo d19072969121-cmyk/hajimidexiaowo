@@ -531,11 +531,11 @@ jobs:
 
           VERSION="${{ needs.resolve.outputs.version }}"
           mkdir -p android-output
-          cp /tmp/signed.apk "android-output/Deep.Student_${VERSION}_arm64.apk"
+          cp /tmp/signed.apk "android-output/AI-Study_${VERSION}_arm64.apk"
 
           rm -f /tmp/release.keystore
 
-          echo "✅ APK 签名完成: Deep.Student_${VERSION}_arm64.apk"
+          echo "✅ APK 签名完成: AI-Study_${VERSION}_arm64.apk"
           ls -lh android-output/
 
       - name: Upload APK

@@ -56,6 +56,14 @@
       "task_dashboard": "制卡",
       "flashcards": "闪卡",
       "data_management": "数据"
+    },
+    "tabs": {
+      "aria_label": "主导航",
+      "home": "首页",
+      "study": "拍题",
+      "review": "复习",
+      "media": "知识",
+      "me": "我的"
     }
   },
   "aria": {

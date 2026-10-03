@@ -9,6 +9,7 @@ import { showGlobalNotification } from '@/components/UnifiedNotification';
 import type { ChatSession } from '../types/session';
 import { debugLog } from '@/debug-panel/debugMasterSwitch';
 import type { TFunction } from 'i18next';
+import { APP_EVENTS, dispatchAppEvent } from '@/events/app';
 import {
   buildHiddenDraftSessionMetadata,
   getDraftSessionScope,
@@ -231,6 +232,14 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
       setTotalSessionCount((prev) => (prev !== null ? prev + 1 : null));
       void loadUngroupedCount();
       setCurrentSessionId(session.id);
+
+      // A3-P0：解析会话就绪 → 广播事件，App 层据此切到解析结果视图。
+      // 放在 setCurrentSessionId 之后，保证 analysis-result 取数时
+      // 会话 id 已写入 store（否则 useAnalysisResultData 会读到空态）。
+      dispatchAppEvent(APP_EVENTS.ANALYSIS_SESSION_CREATED, {
+        sessionId: session.id,
+        imageCount: images.length,
+      });
 
       console.log('[ChatV2Page] Created analysis session:', session.id, 'with', images.length, 'images');
     } catch (error) {

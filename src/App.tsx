@@ -33,6 +33,8 @@ import { StudyComposeIcon } from './components/icons/StudySidebarIcons';
 import { WindowControls } from './components/WindowControls';
 import { DesktopShellTitleEditor } from './components/DesktopShellTitleEditor';
 import { MobileLayoutProvider, MobileHeaderProvider, MobileHeaderNavProvider, MobileHeaderActiveViewSync, MobileAppNavigationProvider, MobilePageScaffold } from '@/components/layout';
+import { MobileTabBar, TabBarHideClaimProvider } from '@/components/navigation/MobileTabBar';
+import { resolveTab, TAB_ROOT_VIEW, type TabId } from '@/config/tabNavigation';
 import { GlobalPomodoroWidget } from '@/features/pomodoro/components/GlobalPomodoroWidget';
 import { initReminderScheduler } from '@/features/todo/reminderScheduler';
 import { ensureAutoSyncSchedulerStarted, useAutoSyncStore } from '@/stores/syncStatusStore';
@@ -155,6 +157,7 @@ import {
   LazyPdfReader,
   LazyTodoPage,
   LazyFlashcardsPage,
+  LazyAnalysisResultPage,
   LazyCrepeDemoPage,
   LazyChatV2IntegrationTest,
   LazyLLMOutputPlayground,
@@ -1318,6 +1321,17 @@ function App() {
     setShowImportConversation(true);
   }, []);
 
+  // A3-P0：拍题解析会话创建完成 → 移动端切到「解析结果」全屏视图。
+  // 仅移动端切换：桌面端沿用既有 chat 会话流（解析结果即流式消息），
+  // 全屏解析页是移动端形态（见 AnalysisResultPage.tsx 头部定位说明）。
+  // setCurrentView 会同时把该 view 记入 visitedViews，
+  // 否则 ViewLayerRenderer 的 visitedViews 门禁会让它渲染 null。
+  useAppEvent(APP_EVENTS.ANALYSIS_SESSION_CREATED, () => {
+    if (isSmallScreenRef.current) {
+      setCurrentView('analysis-result');
+    }
+  }, [setCurrentView]);
+
   // 🎯 监听云存储设置事件
   // 移动端不弹全局配置弹窗（移动端设计契约：表单类流程禁用模态框），
   // 改为导航到 设置 → 数据治理 → 同步 的内联编辑器，可经统一顶栏/系统返回键闭环返回
@@ -1928,6 +1942,19 @@ function App() {
     handleViewChange(view);
     return true;
   }, [handleViewChange]);
+
+  // ── A3 五 Tab 壳层接线 ──
+  // 当前视图属于哪个 Tab（高亮依据）。chat-v2 同时属 home/study，
+  // resolveTab 内由 VIEW_TO_TABS 的优先级规则裁决，无需在此特判。
+  const activeTab = useMemo(() => resolveTab(currentView), [currentView]);
+
+  // 点击 Tab → 导航到该 Tab 的默认落地视图。
+  // 返回 false 表示被移动端导航守卫拦截（如键盘/模态流程中）。
+  const handleSelectTab = useCallback((tab: TabId): boolean => {
+    if (shouldBlockMobileNavigation()) return false;
+    handleViewChange(TAB_ROOT_VIEW[tab]);
+    return true;
+  }, [shouldBlockMobileNavigation, handleViewChange]);
 
   useAppEvent(APP_EVENTS.MOBILE_APP_NAVIGATE, (detail) => {
     const view = detail?.view;
@@ -2763,6 +2790,9 @@ function App() {
       <LearningHubNavigationProvider>
       <DesktopShellSidebarPortalProvider value={desktopShellSidebarPortalValue}>
       <DesktopShellHeaderPortalProvider value={desktopShellHeaderPortalValue}>
+      {/* A3：TabBar 的隐藏声明通道。必须包住 MobileTabBar，否则
+          useTabBarHideClaim() 在无 Provider 时会静默拿到 null 而失效。 */}
+      <TabBarHideClaimProvider>
       <div
         ref={appShellRef}
         data-shell-role="app-shell"
@@ -3077,6 +3107,18 @@ function App() {
               {/* 闪卡复习（传统壳入口） */}
               {renderViewLayer('flashcards', flashcardsContent)}
 
+              {/* A3-P0 解析结果全屏视图（study tab 下的中间环节：拍题→解析→错题→复习）。
+                  注意 ViewLayerRenderer 有 visitedViews 门禁：本视图只有在
+                  曾发生过 setCurrentView('analysis-result') 后才会真正挂载，
+                  否则渲染 null。触发点见 useSessionLifecycle 的解析会话创建流程。 */}
+              {renderViewLayer('analysis-result', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyAnalysisResultPage onBack={() => setCurrentView('chat-v2')} />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
               {import.meta.env.DEV && renderViewLayer('crepe-demo', <Suspense fallback={<PageLoadingFallback />}><MobilePageScaffold><LazyCrepeDemoPage onBack={() => setCurrentView('settings')} /></MobilePageScaffold></Suspense>)}
 
               {import.meta.env.DEV && renderViewLayer('chat-v2-test', <Suspense fallback={<PageLoadingFallback />}><LazyChatV2IntegrationTest /></Suspense>)}
@@ -3092,6 +3134,17 @@ function App() {
 
             </div>
           </main>
+
+          {/* ★ A3 五 Tab 底部导航（home/study/review/media/me）。
+              挂在 workspace 这个 flex-col 内、main 之后，因此天然占据
+              内容区下方的一行；桌面端由 enabled={isSmallScreen} 关闭。
+              组件内部还会校验 useMobileLayout().isMobile 与 tabbar-hide claim，
+              全屏任务页可通过 claim 临时隐藏它。 */}
+          <MobileTabBar
+            activeTab={activeTab}
+            onSelectTab={handleSelectTab}
+            enabled={isSmallScreen && !workbenchActive}
+          />
         </div>
 
       </div>
@@ -3139,6 +3192,7 @@ function App() {
       )}
 
       {/* 调试面板入口由全局悬浮按钮统一控制 */}
+      </TabBarHideClaimProvider>
       </DesktopShellHeaderPortalProvider>
       </DesktopShellSidebarPortalProvider>
       </LearningHubNavigationProvider>
