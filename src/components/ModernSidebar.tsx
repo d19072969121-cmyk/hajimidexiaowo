@@ -1611,7 +1611,7 @@ export const ModernSidebar: React.FC<ModernSidebarProps> = ({
       >
         <div className="flex h-8 items-center justify-between gap-2 px-2">
           <span className="min-w-0 truncate font-[var(--font-family-display,var(--font-family))] text-[18px] font-semibold leading-none text-[color:var(--shell-navigation-foreground)]">
-            DeepStudent
+            AI Study
           </span>
           <div className="flex shrink-0 items-center gap-0.5">
             <SidebarFilterMenu

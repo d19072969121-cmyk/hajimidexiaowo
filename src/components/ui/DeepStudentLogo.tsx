@@ -14,7 +14,7 @@ interface DeepStudentMarkProps {
 /** 黑白应用标（主题色：foreground / background），不含字标 */
 export const DeepStudentMark: React.FC<DeepStudentMarkProps> = ({
   className,
-  title = 'DeepStudent',
+  title = 'AI Study',
 }) => {
   const titleId = React.useId();
 
@@ -39,7 +39,7 @@ export const DeepStudentMark: React.FC<DeepStudentMarkProps> = ({
 
 export const DeepStudentLogo: React.FC<DeepStudentLogoProps> = ({
   className,
-  title = 'DeepStudent',
+  title = 'AI Study',
 }) => {
   const titleId = React.useId();
 

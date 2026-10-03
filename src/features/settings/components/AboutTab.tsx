@@ -133,7 +133,7 @@ export const AboutTab: React.FC = () => {
             <GroupTitle title={t('acknowledgements.developer.title')} />
             <div className="rounded-2xl bg-muted px-3 py-3 sm:px-4"><div className="space-y-px">
               <SettingRow title={t('acknowledgements.developer.fields.developer')}>
-                <span className="text-sm text-foreground/90">DeepStudent Team</span>
+                <span className="text-sm text-foreground/90">AI Study Team</span>
               </SettingRow>
             <SettingRow title={t('acknowledgements.developer.fields.version')}>
               <div className="flex items-center gap-2">

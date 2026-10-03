@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const APP_NAME = 'DeepStudent';
+const APP_NAME = 'AI Study';
 
 /**
  * 将当前会话标题同步到浏览器/窗口标题栏

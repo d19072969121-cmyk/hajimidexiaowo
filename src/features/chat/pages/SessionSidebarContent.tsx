@@ -763,7 +763,7 @@ export function useSessionSidebarContent(deps: UseSessionSidebarContentDeps) {
       data-mobile-sidebar-fixed-region="top"
       className="min-w-0 truncate text-[22px] font-bold leading-none text-foreground"
     >
-      DeepStudent
+      AI Study
     </p>
   ), []);
 
