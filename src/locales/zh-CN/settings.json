@@ -3083,5 +3083,18 @@
       "error": "错误"
     },
     "mobile_hidden": "插件功能仅在桌面端可用"
+  },
+  "questionBank": {
+    "title": "题库 API",
+    "subtitle": "刷题的数据来源。未配置时刷题不可用。",
+    "configured": "已配置",
+    "goConfigure": "去配置",
+    "chooseProvider": "选择题库来源",
+    "filled": "凭据已填齐",
+    "notFilled": "凭据未填齐",
+    "fillSandbox": "填入沙箱地址",
+    "viewDocs": "查看接口文档",
+    "save": "保存",
+    "loading": "读取中…"
   }
 }

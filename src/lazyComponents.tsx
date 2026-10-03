@@ -157,6 +157,17 @@ export const LazyReviewHubPage = React.lazy(() =>
   import('@/features/review/pages/ReviewHubPage').then(m => ({ default: m.ReviewHubPage }))
 );
 
+// E3：刷题入口页（温故新知 / 自己定类型）。刷题独立于卡片逻辑，自成一套。
+export const LazyPracticeHubPage = React.lazy(() =>
+  import('@/features/practice/pages/PracticeHubPage').then(m => ({ default: m.PracticeHubPage }))
+);
+
+// E4：拍题页。study Tab 落地视图，整条链的起点。
+// 相机能力复用上游的 capture="environment"（纯 Web 标准，无需原生插件）。
+export const LazyCapturePage = React.lazy(() =>
+  import('@/features/capture/pages/CapturePage').then(m => ({ default: m.CapturePage }))
+);
+
 // 开发专用组件：生产构建中 import.meta.env.DEV 为 false，动态 import 被 Rollup 死代码消除
 const DevNull: React.FC<any> = () => null;
 const devLazy = () => Promise.resolve({ default: DevNull as React.ComponentType<any> });

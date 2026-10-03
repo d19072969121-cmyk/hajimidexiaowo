@@ -1150,7 +1150,10 @@
     "toggle_sidebar": "切换边栏",
     "resize_sidebar": "调整边栏宽度",
     "llm_playground": "LLM Playground",
-    "analysis_result": "解析结果"
+    "analysis_result": "解析结果",
+    "review_hub": "复习",
+    "practice_hub": "刷题",
+    "capture": "拍题"
   },
   "time": {
     "now": "刚刚",
@@ -3995,5 +3998,36 @@
     "readyMessage": "更新已下载完成，重启应用后生效",
     "restartNow": "立即重启",
     "installerLaunched": "已调起系统安装器，请在安装器中完成安装"
+  },
+  "practiceHub": {
+    "title": "刷题",
+    "back": "返回",
+    "configure": "题库 API 配置",
+    "notConfiguredTitle": "题库 API 未配置",
+    "notConfiguredDesc": "刷题需要题库数据源。请先选择题库来源并填写凭据。",
+    "goConfigure": "去配置"
+  },
+  "reviewHub": {
+    "title": "复习",
+    "back": "返回",
+    "loading": "加载中…",
+    "clearFilter": "清除筛选",
+    "filterEmpty": "没有符合筛选的错题",
+    "noMistakes": "还没有错题，去「拍题」试试",
+    "mistakePreview": "错题本",
+    "loadFailed": "错题本加载失败：{{msg}}"
+  },
+  "capture": {
+    "title": "拍题",
+    "openChat": "直接对话",
+    "takePhoto": "拍照搜题",
+    "takePhotoHint": "对准题目拍摄，自动识别解析",
+    "pickGallery": "从相册选择",
+    "selectedCount": "已选 {{count}} 张",
+    "clear": "清空",
+    "remove": "移除",
+    "submit": "开始解析",
+    "submitting": "识别中…",
+    "emptyHint": "拍下或选择题目照片，AI 会识别并给出解析"
   }
 }

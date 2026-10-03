@@ -3083,5 +3083,18 @@
       "error": "Error"
     },
     "mobile_hidden": "Plugins are desktop-only"
+  },
+  "questionBank": {
+    "title": "Question Bank API",
+    "subtitle": "Data source for practice. Practice is unavailable until configured.",
+    "configured": "Configured",
+    "goConfigure": "Configure",
+    "chooseProvider": "Choose provider",
+    "filled": "Credentials complete",
+    "notFilled": "Credentials incomplete",
+    "fillSandbox": "Fill sandbox URL",
+    "viewDocs": "View API docs",
+    "save": "Save",
+    "loading": "Loading…"
   }
 }

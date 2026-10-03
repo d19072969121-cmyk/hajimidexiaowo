@@ -191,6 +191,36 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
   // 🔧 P1-005 修复：使用 ref 追踪最新状态，避免 deleteSession 中的闭包竞态条件
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+
+  /**
+   * 反向同步：sessionManager 的当前会话变更 → ChatV2Page 本地 state。
+   *
+   * ## 为什么必须有（E4 拍题链路修复）
+   * 本页此前对 sessionManager 是**单向写**：只有包装版 `setCurrentSessionId`
+   * 会写进去，从不订阅其回推。于是「App 层直接调 sessionManager」的路径
+   * （拍题页的 captureToAnalysisSession）会让本页 state 完全不知情 →
+   * `<ChatContainer sessionId={currentSessionId}>` 的 prop 不变 →
+   * useTauriAdapter 不为新会话 setup → `initSession`/`onInit` 不执行 →
+   * **OCR 与解析永不发起**，用户拍完照只能看到解析页永久转圈。
+   *
+   * ## 守卫
+   * - 与本页 state 相同则跳过：既避免无事发生的重渲染，也切断了回声循环
+   *   （本 effect 调包装 setCurrentSessionId 会再写 sessionManager，回声在此终止）
+   * - 启动期不接管：初始会话由 loadSessions 决定，此处抢写会与 draft 会话
+   *   / sessionPrefetch 竞争。用 `initialLoadingRef`（下方同步，避免 TDZ）
+   */
+  const initialLoadingRef = useRef(true);
+  useEffect(() => {
+    const unsubscribe = sessionManager.subscribe((event) => {
+      if (event.type !== 'current-session-changed') return;
+      const nextId = event.sessionId || null;
+      if (nextId === currentSessionIdRef.current) return;
+      if (initialLoadingRef.current) return;
+      setCurrentSessionId(nextId);
+    });
+    return unsubscribe;
+  }, [setCurrentSessionId]);
+
   const [attachmentPreviewOpen, setAttachmentPreviewOpen] = useState(false);
   const [sessionSheetOpen, setSessionSheetOpen] = useState(false);
   const sandboxActiveSession = useSandboxWorkbenchStore(
@@ -225,6 +255,8 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   // 🔧 防闪烁：首次加载会话列表期间为 true，避免短暂显示全空状态
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // 同步给上方反向同步 effect 用（effect 声明早于本 state，用 ref 避 TDZ）
+  initialLoadingRef.current = isInitialLoading;
   const globalLeftPanelCollapsed = useUIStore((state) => state.leftPanelCollapsed);
   const [localSidebarCollapsed, setLocalSidebarCollapsed] = useState(false);
   const sidebarCollapsed = globalLeftPanelCollapsed || localSidebarCollapsed;

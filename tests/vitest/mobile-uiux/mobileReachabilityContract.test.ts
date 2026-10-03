@@ -62,6 +62,15 @@ const CONTEXTUAL_ENTRY_VIEWS = new Set([
   // A3-P0：解析结果全屏任务页。由「拍题/答疑」流程推入（拍题 → 解析 → 错题 → 复习），
   // 是任务流中间态而非常驻目的地，故不进抽屉/命令面板——与 pdf-reader 同性质。
   'analysis-result',
+  // A5/E3：复习入口页与刷题入口页。二者都是 review Tab 根视图推入的下一层，
+  // 同属任务流中间态（与 analysis-result 同性质），不占抽屉/命令面板格子。
+  // ⚠️ 漏登记会让本契约报红「unreachable」——E1 的 review-hub 曾因此长期红灯，
+  //    E3 的 practice-hub 是第二例，一并补齐。
+  'review-hub',
+  'practice-hub',
+  // E4：拍题页。study Tab 的落地视图（TAB_ROOT_VIEW.study='capture'），
+  // 本身就是一格 Tab 的根，不经抽屉/命令面板，故登记在此。
+  'capture',
 ]);
 
 /** 匹配 view: 'xxx'（含 view: 'xxx' as CurrentView / as NavViewType） */

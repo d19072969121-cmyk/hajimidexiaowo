@@ -120,6 +120,7 @@ import { debugLog } from './debug-panel/debugMasterSwitch';
 import { toggleDevtools } from './dev/devtools';
 import { useIsUILabEnabled } from './utils/uiLabToggle';
 import { sessionManager } from './features/chat/core/session/sessionManager';
+import { createSessionWithDefaults } from './features/chat/core/session/createSessionWithDefaults';
 import { GoalStatusChip } from './features/chat/components/GoalStatusChip';
 import { setSessionSidebarViewContext } from './features/chat/hooks/useSessionSidebarIndicators';
 import { useActiveChatStore } from './features/chat/hooks/useActiveChatStore';
@@ -160,6 +161,8 @@ import {
   LazyFlashcardsPage,
   LazyAnalysisResultPage,
   LazyReviewHubPage,
+  LazyPracticeHubPage,
+  LazyCapturePage,
   LazyCrepeDemoPage,
   LazyChatV2IntegrationTest,
   LazyLLMOutputPlayground,
@@ -1162,6 +1165,7 @@ function App() {
   // sessionManager 会发 session-created，hook 重取，页面自然从空态过渡到内容态。
   const analysisResultStore = useActiveChatStore();
 
+
   // 包装 setCurrentView，添加视图切换追踪 + LRU 淘汰
   const setCurrentView = useCallback((newView: CurrentView | ((prev: CurrentView) => CurrentView)) => {
     const prevView = currentViewRef.current;
@@ -1245,6 +1249,59 @@ function App() {
       setCurrentViewRaw(targetView);
     });
   }, []);
+
+  // ==========================================================================
+  // E4 拍题：File[] → analysis 会话 → 解析结果页
+  //
+  // 为什么在 App 层而不是 CapturePage 里做：
+  //   建会话要动 sessionManager，还要切视图（setCurrentView）。这两个都是
+  //   App 壳的职责；页面只负责「拿到照片并交出来」，保持展示层无副作用。
+  //
+  // 与既有 `createAnalysisSession`（useChatPageEvents 内）的区别：
+  //   那条路径自己 `dialogOpen()` 打开文件对话框——手机上没有拍照能力。
+  //   本函数接收**已经拿到的 File[]**，因此可同时服务于相机与相册两个入口。
+  // ==========================================================================
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  const captureToAnalysisSession = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    setIsCapturing(true);
+    setCaptureError(null);
+    try {
+      // File → data URL（base64）。与 useSessionLifecycle.ts:191-204 的读图
+      // 结果同格式：analysis 模式的 initConfig.images 期望 data URL 数组。
+      const images = await Promise.all(
+        files.map((file) => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ''));
+          reader.onerror = () => reject(new Error(`读取图片失败: ${file.name}`));
+          reader.readAsDataURL(file);
+        })),
+      );
+
+      const session = await createSessionWithDefaults({
+        mode: 'analysis',
+        title: t('page.analysis_session_title'),
+        metadata: { initConfig: { images } },
+        initConfig: { images },
+      });
+
+      // ⚠️ 顺序至关重要（上游 useSessionLifecycle.ts:234-242 同款）：
+      //   1) 先把该会话设为「当前会话」——否则 setCurrentView 后，
+      //      analysis-result 上的 useActiveChatStore() 经 getCurrentSessionId()
+      //      拿到的仍是旧值/空值，解析页会停在空态。
+      //   2) 再切视图。
+      // 至于 store 本身，createSessionWithDefaults 内部已用同一 initConfig
+      // 完成 getOrCreate（createSessionWithDefaults.ts:53），无需重复。
+      sessionManager.setCurrentSessionId(session.id);
+      setCurrentView('analysis-result');
+    } catch (err) {
+      setCaptureError(getErrorMessage(err));
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [setCurrentView, t]);
 
   useEffect(() => {
     let shouldOpenRecoveryReceipt = false;
@@ -2616,6 +2673,8 @@ function App() {
       'llm-playground': t('common:navigation.llm_playground'),
       'analysis-result': t('common:navigation.analysis_result'),
       'review-hub': t('common:navigation.review_hub', '复习'),
+      'practice-hub': t('common:navigation.practice_hub', '刷题'),
+      'capture': t('common:navigation.capture', '拍题'),
     };
 
     return labels[currentView] ?? t('common:app.default_header');
@@ -3138,6 +3197,52 @@ function App() {
                 <Suspense fallback={<PageLoadingFallback />}>
                   <MobilePageScaffold>
                     <LazyReviewHubPage onNavigate={setCurrentView} />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
+              {/* E4 拍题页：study Tab 的落地视图，整条链的起点。
+                  相机走隐藏的 capture="environment" input（纯 Web 标准），
+                  照片经 captureToAnalysisSession 建 analysis 会话并跳解析结果页。 */}
+              {renderViewLayer('capture', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyCapturePage
+                      onSubmitImages={captureToAnalysisSession}
+                      isSubmitting={isCapturing}
+                      error={captureError}
+                      onOpenChat={() => setCurrentView('chat-v2')}
+                    />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
+              {/* E3 刷题入口页：温故新知 / 自己定类型。
+                  刷题独立于卡片逻辑（用户明确要求不与 flashcards 共用）。
+                  未配置题库 API 时两个入口置灰，并引导去 设置→模型 配置。 */}
+              {renderViewLayer('practice-hub', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyPracticeHubPage
+                      onBack={() => setCurrentView('review-hub')}
+                      // 跳到具体刷题会话由后续轮次接（真实题库 API 接入时才有目标），
+                      // 此处先回落到 reviewing 列表，避免死 prop。
+                      onStartPractice={(mode) => {
+                        if (import.meta.env.DEV) {
+                          console.log('[App] 刷题模式:', mode);
+                        }
+                        setCurrentView('chat-v2');
+                      }}
+                      // 深链到 设置 → 模型 Tab（题库配置区挂在 ModelsTab 内）。
+                      // 必须走 setPendingSettingsRoute + SETTINGS_NAVIGATE_TAB：
+                      // 题设置页可能尚未挂载，仅 setCurrentView 会落在首屏而非 models。
+                      onConfigureQuestionBank={() => {
+                        const route = { tab: 'models' as const };
+                        setPendingSettingsRoute(route);
+                        dispatchAppEvent(APP_EVENTS.SETTINGS_NAVIGATE_TAB, route);
+                        setCurrentView('settings');
+                      }}
+                    />
                   </MobilePageScaffold>
                 </Suspense>
               ))}

@@ -48,6 +48,10 @@ const BASE_CANONICAL_VIEWS: CurrentView[] = [
   // 注意命名：不能叫 'review'——DEPRECATED_VIEW_MAP 里 'review' 是历史废弃
   // 视图名，会被 canonicalizeView 静默重定向到 'chat-v2'。
   'review-hub',
+  // E3：刷题入口页（温故新知 / 自己定类型）。刷题独立于卡片逻辑，故独立视图。
+  'practice-hub',
+  // E4：拍题页。study Tab 的落地视图，是「拍题 → 解析 → 错题 → 复习」链路的起点。
+  'capture',
 ];
 
 const DEV_ONLY_VIEWS: CurrentView[] = ['crepe-demo', 'chat-v2-test', 'llm-playground'];

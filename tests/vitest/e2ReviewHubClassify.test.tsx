@@ -88,6 +88,25 @@ describe('ReviewHubPage 归类 UI', () => {
     }
   });
 
+  it('四个入口各自的跳转目标正确（防止改了 view 却无感）', () => {
+    // 交叉审查发现：原用例只验 testid 存在，入口的 view 从 'flashcards'
+    // 改成 'practice-hub' 后语义巨变而测试完全无感。此处补上跳转断言。
+    const onNavigate = vi.fn();
+    render(<ReviewHubPage onNavigate={onNavigate} />);
+
+    // 单词卡片 → flashcards
+    fireEvent.click(screen.getByTestId('review-hub-entry-flashcards'));
+    expect(onNavigate).toHaveBeenCalledWith('flashcards');
+
+    // 刷题 → practice-hub（E3 起独立入口页，不再占位跳 flashcards）
+    fireEvent.click(screen.getByTestId('review-hub-entry-practice'));
+    expect(onNavigate).toHaveBeenCalledWith('practice-hub');
+
+    // 易错点 → 仍是 flashcards（错因维度复用其视图，尚未独立）
+    fireEvent.click(screen.getByTestId('review-hub-entry-weak-points'));
+    expect(onNavigate).toHaveBeenCalledWith('flashcards');
+  });
+
   it('条目就绪后按会话 id 批量拉取标签', () => {
     render(<ReviewHubPage />);
     expect(loadTagsForSessions).toHaveBeenCalledWith(['s1', 's2']);

@@ -60,6 +60,8 @@ const VIEW_REGISTRY_FILES: Record<string, string> = {
   'llm-playground': 'src/features/chat/dev/playground/LLMOutputPlayground.tsx',
   'analysis-result': 'src/components/analysis/AnalysisResultView.tsx',
   'review-hub': 'src/features/review/pages/ReviewHubPage.tsx',
+  'practice-hub': 'src/features/practice/pages/PracticeHubPage.tsx',
+  'capture': 'src/features/capture/pages/CapturePage.tsx',
 };
 
 /** MobileHeaderContext 的 JSDoc 里有 useMobileHeader('settings', ...) 等示例注释，排除该文件 */

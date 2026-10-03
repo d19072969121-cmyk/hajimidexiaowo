@@ -87,9 +87,10 @@ const HUB_ENTRIES: readonly HubEntry[] = [
   {
     id: 'practice',
     title: '刷题',
-    subtitle: '专项练习与巩固',
+    subtitle: '温故新知与自选范围',
     icon: StudyBooksIcon,
-    view: 'flashcards',
+    // E3：刷题有了独立入口页（温故新知 / 自己定类型），不再占位跳 flashcards。
+    view: 'practice-hub',
     accentClass: 'text-emerald-500',
   },
 ];

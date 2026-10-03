@@ -54,7 +54,9 @@ export const TAB_ORDER: readonly TabId[] = TAB_IDS;
  */
 export const TAB_ROOT_VIEW: Readonly<Record<TabId, CurrentView>> = {
   home: 'chat-v2',
-  study: 'chat-v2',
+  // E4：study 改为落拍题页——拍题是这一格的主语义，也是整条链的起点。
+  // chat-v2 仍属 ['home','study']（见 VIEW_TO_TABS），从拍题页进对话时高亮仍正确。
+  study: 'capture',
   // A5：复习 Tab 不再直接落 flashcards（那只覆盖「单词卡片」一项），
   // 改为落复习入口页，由它分发到错题本 / 单词卡片 / 易错点 / 刷题。
   review: 'review-hub',
@@ -90,11 +92,17 @@ export const VIEW_TO_TABS: Readonly<Record<CurrentView, readonly TabId[]>> = {
   // 'data-management'，因此本键在运行时是死键（单测断言了这一点）。
   'dashboard': ['me'],
 
+  // study：拍题页（E4）。旧注释「拍摄/答疑与 home 共用 chat-v2 宿主」在
+  // study 改落 capture 后不再适用于本键本身，但 chat-v2 的双归属保留。
+  'capture': ['study'],
+
   // review：制卡产出 → 闪卡消化
   'flashcards': ['review'],
   'task-dashboard': ['review'],
   // A5：复习入口页（错题本 / 单词卡片 / 易错点 / 刷题）
   'review-hub': ['review'],
+  // E3：刷题入口页（温故新知 / 自己定类型）。刷题归 review Tab。
+  'practice-hub': ['review'],
 
   // media：知识资源与文档阅读
   'learning-hub': ['media'],

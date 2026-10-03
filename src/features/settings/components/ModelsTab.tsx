@@ -14,6 +14,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { DimensionManagement } from './DimensionManagement';
 import { showGlobalNotification } from '@/components/UnifiedNotification';
 import { OcrEngineCard } from './OcrEngineCard';
+import { QuestionBankApiSection } from './QuestionBankApiSection';
 import { cn } from '@/lib/utils';
 import type { ApiConfig } from '@/types';
 import { supportsKnowledgeModelCapability } from './knowledgeModelCapabilities';
@@ -426,6 +427,14 @@ export const ModelsTab: React.FC<ModelsTabProps> = ({
              toUnifiedModelInfo={toUnifiedModelInfo}
              getAllEnabledApis={getAllEnabledApis}
            />
+        </div>
+
+        {/* 题库 API 配置（E3）：刷题功能的数据源。
+            放在「模型」类下与既有做法一致——本 Tab 的配置状态概览里
+            已有 qbank_ai_grading / qbank_ai_generation 两项题库相关模型，
+            「题库」本就属这一分类。 */}
+        <div className="mt-8">
+          <QuestionBankApiSection />
         </div>
 
         {/* 配置状态概览 */}
