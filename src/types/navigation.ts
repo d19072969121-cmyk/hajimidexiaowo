@@ -28,6 +28,7 @@ export type CurrentView =
   | 'analysis-result'   // A3-P0：解析结果全屏视图（拍题 → 解析 → 错题 → 复习 中间环节）
   | 'review-hub'        // A5：复习入口页（错题本 / 单词卡片 / 易错点 / 刷题 四入口）
   | 'practice-hub'      // E3：刷题入口页（温故新知 / 自己定类型），独立于卡片逻辑
+  | 'practice-session'  // E8：刷题会话页（温故新知搜同类题 / 自己定类型选范围）——用户反馈 ③
   | 'capture'           // E4：拍题页（study Tab 落地页，链路的起点）
   | 'knowledge-cards'   // E5：知识卡片页（原「单词卡片」改名，与小知识点速查对应）
   | 'weak-points'       // E5：易错点页（独立于知识卡片，含 AI 自动沉淀 + 手动添加）

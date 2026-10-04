@@ -162,6 +162,7 @@ import {
   LazyAnalysisResultPage,
   LazyReviewHubPage,
   LazyPracticeHubPage,
+  LazyPracticeSessionPage,
   LazyCapturePage,
   LazyKnowledgeCardsPage,
   LazyWeakPointsPage,
@@ -1178,6 +1179,17 @@ function App() {
    * 显式记下用户点的那一条，语义无歧义。
    */
   const [openedMistakeSessionId, setOpenedMistakeSessionId] = useState<string | null>(null);
+
+  /**
+   * 用户从刷题入口页点的那一项（温故新知 / 自己定类型）。
+   *
+   * 与 `openedMistakeSessionId` 同款理由：刷题会话页需要**明确的进入模式**，
+   * 而导航是异步的 —— 靠 URL/视图反推会在首帧拿到旧值。
+   * 显式记下用户点的那一项，语义无歧义（用户反馈 ③）。
+   */
+  const [practiceSessionMode, setPracticeSessionMode] = useState<
+    'review-variants' | 'by-category'
+  >('review-variants');
 
 
   // 包装 setCurrentView，添加视图切换追踪 + LRU 淘汰
@@ -2741,6 +2753,7 @@ function App() {
       'analysis-result': t('common:navigation.analysis_result'),
       'review-hub': t('common:navigation.review_hub', '复习'),
       'practice-hub': t('common:navigation.practice_hub', '刷题'),
+      'practice-session': t('common:navigation.practice_session', '刷题'),
       'capture': t('common:navigation.capture', '拍题'),
       'knowledge-cards': t('common:navigation.knowledge_cards', '知识卡片'),
       'weak-points': t('common:navigation.weak_points', '易错点'),
@@ -3347,6 +3360,28 @@ function App() {
                 </Suspense>
               ))}
 
+              {/* E8 刷题会话页（用户反馈 ③）：温故新知搜同类题 / 自己定类型选范围。
+                  数据层走 `bankClient.ts`（唯一 invoke 调用点）。
+                  - 「最近一道错题」由本层提供：App 持有会话列表与错题本口径，
+                    页面不该自己去拉（`getLatestMistakeSessionId` 注入）。
+                  - 未配置题库时页面自行显示引导（不静默失败）。 */}
+              {renderViewLayer('practice-session', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyPracticeSessionPage
+                      mode={practiceSessionMode}
+                      onBack={() => setCurrentView('practice-hub')}
+                      onConfigureQuestionBank={() => {
+                        const route = { tab: 'models' as const };
+                        setPendingSettingsRoute(route);
+                        dispatchAppEvent(APP_EVENTS.SETTINGS_NAVIGATE_TAB, route);
+                        setCurrentView('settings');
+                      }}
+                    />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
               {/* E3 刷题入口页：温故新知 / 自己定类型。
                   刷题独立于卡片逻辑（用户明确要求不与 flashcards 共用）。
                   未配置题库 API 时两个入口置灰，并引导去 设置→模型 配置。 */}
@@ -3355,13 +3390,13 @@ function App() {
                   <MobilePageScaffold>
                     <LazyPracticeHubPage
                       onBack={() => setCurrentView('review-hub')}
-                      // 跳到具体刷题会话由后续轮次接（真实题库 API 接入时才有目标），
-                      // 此处先回落到 reviewing 列表，避免死 prop。
+                      // 用户反馈 ③ 修复：此前这里只打一条 DEV log 就 `setCurrentView('chat-v2')`
+                      // —— **点「温故新知 / 自己定类型」什么都不发生**（用户可见的假功能）。
+                      // 根因是「题库 API 当时没接，没有跳转目标」。现在题库已接
+                      // （Rust `question_bank_*` + `bankClient.ts`），故真正跳到刷题会话页。
                       onStartPractice={(mode) => {
-                        if (import.meta.env.DEV) {
-                          console.log('[App] 刷题模式:', mode);
-                        }
-                        setCurrentView('chat-v2');
+                        setPracticeSessionMode(mode);
+                        setCurrentView('practice-session');
                       }}
                       // 深链到 设置 → 模型 Tab（题库配置区挂在 ModelsTab 内）。
                       // 必须走 setPendingSettingsRoute + SETTINGS_NAVIGATE_TAB：

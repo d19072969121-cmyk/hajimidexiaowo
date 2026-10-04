@@ -20,7 +20,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 import {
   StudyBooksIcon,
@@ -200,10 +200,30 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
     [isLoaded, error, entries.length],
   );
 
+  /**
+   * 错题本预览区的锚点（用户反馈 ⑥ 的残留修复）。
+   *
+   * ## 问题
+   * 「错题本」入口卡此前是 `disabled`（`view === null`），注释自承「本轮为占位」。
+   * 但**下方其实已有完整的错题本预览区**（筛选 + 条目 + 标签增删）。
+   * 用户看到一张大字卡片「错题本」，点下去**毫无反应**，得自己往下滚才能用 ——
+   * 这正是用户反馈「错题本子 UI 没有」的感受来源：不是没有，是**够不着**。
+   *
+   * ## 修法
+   * 入口卡改为可点，点击**滚动到预览区并聚焦**（而非导航到别的视图）。
+   * 不改成跳转到独立页，是因为预览区就在本页、且带本页的标签筛选状态 ——
+   * 跳走反而割裂。真正的「独立错题详情页」已由 `mistake-detail` 承担（点条目进）。
+   */
+  const mistakePreviewRef = React.useRef<HTMLElement>(null);
+
   const handleEntryClick = useCallback(
     (entry: HubEntry) => {
-      if (!entry.view) return;
-      onNavigate?.(entry.view);
+      if (entry.view) {
+        onNavigate?.(entry.view);
+        return;
+      }
+      // view === null：本页内展开的项（目前只有错题本）→ 滚到预览区
+      mistakePreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
     [onNavigate],
   );
@@ -250,14 +270,13 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
                 type="button"
                 data-testid={`review-hub-entry-${entry.id}`}
                 onClick={() => handleEntryClick(entry)}
-                disabled={entry.view === null}
                 className={cn(
                   'flex min-h-[104px] flex-col justify-between rounded-xl border border-border p-3 text-left',
                   'bg-card transition-colors',
-                  // 错题本本轮为占位（view === null）：禁用态但仍可读，避免假可点
-                  entry.view === null
-                    ? 'cursor-default opacity-60'
-                    : 'hover:bg-accent active:bg-accent',
+                  // 用户反馈 ⑥：错题本（view === null）**不再禁用** —— 本页下方便是完整
+                  // 的错题本预览区，点击滚到那里即可。此前 disabled 让用户以为「错题本
+                  // 不存在/没做」，实际是够不着。
+                  'hover:bg-accent active:bg-accent',
                 )}
                 aria-label={entry.title}
               >
@@ -275,8 +294,12 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
                 <div className="mt-2">
                   <div className="flex items-center gap-1 text-sm font-medium text-foreground">
                     <span>{entry.title}</span>
-                    {entry.view !== null && (
+                    {/* 用户反馈 ⑥：本页内展开的项（错题本）给**向下**箭头 —— 
+                        与「跳转到别的视图」（向右箭头）区分开，否则用户以为点了会离开本页 */}
+                    {entry.view !== null ? (
                       <ArrowRight size={13} className="text-muted-foreground" aria-hidden="true" />
+                    ) : (
+                      <ArrowDown size={13} className="text-muted-foreground" aria-hidden="true" />
                     )}
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -289,7 +312,7 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
         </div>
 
         {/* 错题本：筛选条 + 条目（标签可增删，即「手动归类」） */}
-        <section className="mt-4" data-testid="review-hub-mistake-preview">
+        <section ref={mistakePreviewRef} className="mt-4" data-testid="review-hub-mistake-preview">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-xs font-medium text-muted-foreground">
               {t('reviewHub.mistakePreview', '错题本')}

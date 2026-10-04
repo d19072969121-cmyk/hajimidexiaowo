@@ -113,6 +113,83 @@ export type BankSearchOutcome =
   | { kind: 'quota'; registerUrl: string }
   | { kind: 'error'; message: string };
 
+// ----------------------------------------------------------------------------
+// 元数据（「自己定类型」的维度选择）
+// ----------------------------------------------------------------------------
+
+/**
+ * 题库元数据条目。
+ *
+ * 对齐 Rust 透传的 JSON —— Rust 侧 `question_bank_list_meta` 把上游条目**原样**
+ * 塞进 `items`（只做包装，不裁剪字段），故各 kind 的字段集**不同**：
+ *   - `subjects`：`{id, name, pinyin}`（实测 `pinyin` 恒为 `null`，别依赖它排序展示）
+ *   - `grades`：`{id, name}`
+ *   - `editions`：`{id, name}`
+ *   - `chapters`：`{id, name, parent_id, level, subject_id, phase_id, grade_id, edition_id, has_children}`
+ *   - `knowledge-points`：`{id, name, parent_id, level, old_id, knowledge_id, has_children}`
+ * 故这里只声明**跨 kind 稳定**的两个字段，其余走索引签名按需窄化 ——
+ * 声明成某个 kind 的完整形状会在另一个 kind 上撒谎。
+ */
+export interface BankMetaItem {
+  id: number | string;
+  name: string;
+  /** 学科有 pinyin；其它 kind 可能没有 */
+  [key: string]: unknown;
+}
+
+/**
+ * 元数据类型（对应 Rust `question_bank_list_meta` 的 `kind` 参数）。
+ *
+ * 取值即 `normalize_meta_kind`（`src-tauri/src/cmd/question_bank.rs:937-949`）
+ * 的合法集合。Rust 对 `knowledge-points` 额外接受 `knowledge_points` /
+ * `knowledgepoints` 两种写法，但返回的 `kind` 恒归一为 `knowledge-points` ——
+ * 本类型直接给规范写法，避免前端出现三种同义取值。
+ */
+export type BankMetaKind =
+  | 'subjects'
+  | 'grades'
+  | 'editions'
+  | 'chapters'
+  | 'knowledge-points';
+
+/** 元数据查询参数（与 Rust `question_bank_list_meta` 对齐） */
+export interface BankMetaParams {
+  subjectId?: number;
+  /**
+   * 服务端**必需**（`editions` / `chapters` / `knowledge-points`）。
+   * 实测缺省会返回 FastAPI 校验错误：
+   * `{"detail":[{"type":"missing","loc":[query","subject_id"],"msg":"Field required"}]}`
+   */
+  gradeId?: number;
+  /**
+   * 服务端**必需**（`knowledge-points`）。实测缺省仍是 subject 校验错，
+   * 补上后返回顶层知识点（`parent_id: 0`）。
+   */
+  parentId?: number;
+  /** 传了就按该版次过滤 `chapters`（实测生效）。 */
+  editionId?: number;
+}
+
+/** 过滤器：`fetchQuestionBankMeta` 成功但该维度**没有可选值**时返回它 */
+export interface BankMetaZero {
+  zero: true;
+  kind: BankMetaKind;
+}
+
+/**
+ * 元数据拉取的三种非成功态 + 成功态（与 `BankSearchOutcome` 同构）。
+ *
+ * 为什么把「空」`zero` 与「成功」分开而不是用 `items.length > 0` 判断维护：
+ * 消费方（选择器组件）必须对**同一份数据**做两种渲染决策 ——
+ * 有值渲染列表、无值渲染「该学科下暂无知识点」而非空白。把判定收在这里，
+ * 避免每个调用点各写一遍 `length` 检查（漏一个就是一片无法解释的空白）。
+ */
+export type BankMetaOutcome =
+  | { kind: 'ok'; items: BankMetaItem[] }
+  | { kind: 'zero'; metaKind: BankMetaKind }
+  | { kind: 'unconfigured' }
+  | { kind: 'error'; message: string };
+
 // ============================================================================
 // 常量
 // ============================================================================
@@ -335,4 +412,152 @@ export async function fetchQuestionBankQuota(): Promise<BankQuota | null> {
     registerUrl: str(r.registerUrl),
     registeredDailyLimit: num(r.registeredDailyLimit),
   };
+}
+
+/**
+ * 【唯一 invoke 调用点 · 元数据】
+ *
+ * 拉取某个维度的可选值（学科 / 年级 / 版次 / 章节 / 知识点），供「自己定类型」
+ * 的维度选择器使用。**免费、不消费额度**（Rust 侧注释 `question_bank.rs:985`）。
+ *
+ * ## 参数（三重契约，逐条实测核对）
+ * 1. **命令名** `question_bank_list_meta` —— 签名 `kind: String`，仅此一个参数
+ *    （`question_bank.rs:994-996`）。Tauri 负责 camelCase → snake_case，
+ *    故前端传 `subjectId` 等即可。
+ * 2. ⚠️ **Rust 命令本身只透传 `kind`** —— `let path = format!("v1/meta/{kind}")`
+ *    后调 `get_json(state, &path, &[])`，query **恒为空数组**（`question_bank.rs:999-1001`）。
+ *    也就是说 `subjectId` / `gradeId` / `parentId` / `editionId` 这四个字段
+ *    在当前 Rust 版本里**到不了上游**。
+ * 3. 但上游**确实要求**它们：实测 `GET /v1/meta/editions`（不带参）返回
+ *    `{"detail":[{"type":"missing","loc":["query","subject_id"],"msg":"Field required"}]}`，
+ *    `chapters` / `knowledge-points` 同样；`/v1/meta/subjects` `grades` 才是免费无参。
+ *
+ * 故这四个参数**照传**（后端补 query 透传后就立刻生效，无需再改前端），
+ * 但调用方必须知道：**在上面第 2 条被修掉之前，依赖它们的 kind 必定失败**。
+ * 实测有效调用见文件尾注释。
+ */
+export async function fetchQuestionBankMeta(
+  kind: BankMetaKind,
+  params?: BankMetaParams,
+): Promise<BankMetaItem[]> {
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  const raw = await invoke<unknown>('question_bank_list_meta', {
+    kind,
+    subjectId: params?.subjectId,
+    gradeId: params?.gradeId,
+    parentId: params?.parentId,
+    editionId: params?.editionId,
+  });
+
+  // Rust 侧统一包装成 `{kind, items, usedTrial}`（空数组也在 `items` 里），
+  // 但上游形状一旦漂移（如再次变回裸数组）不能让整页崩掉 —— 两种都认。
+  if (Array.isArray(raw)) return raw as BankMetaItem[];
+  if (raw && typeof raw === 'object') {
+    const items = (raw as { items?: unknown }).items;
+    return Array.isArray(items) ? (items as BankMetaItem[]) : [];
+  }
+  return [];
+}
+
+/**
+ * 【唯一 invoke 调用点 · 元数据（多态版）】
+ *
+ * 与 {@link fetchQuestionBankMeta} 同源，但把「空结果」与「失败」显式分开，
+ * 供选择器组件直接分流 UI，避免每个消费方各写一遍 `catch` + `length` 判断。
+ *
+ * 与 {@link searchQuestionBank} 的语义差异：**本函数不做额度判定** ——
+ * 元数据不消费额度，出现 `quota` 态没有意义（真出现只可能是后端路由错了）。
+ */
+export async function fetchQuestionBankMetaOutcome(
+  kind: BankMetaKind,
+  params?: BankMetaParams,
+  opts?: { isConfigured?: boolean },
+): Promise<BankMetaOutcome> {
+  // 配置门禁前置：未配置题库时不发请求，直接给「去配置」引导。
+  // 与 MistakeDetailPage 的做法一致 —— 比「等后端报错再猜」既快又准。
+  // `undefined` 表示调用方不掌握配置状态，此时**不**拦截（交给后端裁决）。
+  if (opts?.isConfigured === false) return { kind: 'unconfigured' };
+
+  try {
+    const items = await fetchQuestionBankMeta(kind, params);
+    return items.length > 0
+      ? { kind: 'ok', items }
+      : { kind: 'zero', metaKind: kind };
+  } catch (err) {
+    return { kind: 'error', message: getErrorMessage(err) };
+  }
+}
+
+// ============================================================================
+// 「温故新知」：从错题题干搜同类题（用户反馈 ③）
+// ============================================================================
+
+/**
+ * 从某个 analysis（错题）会话里取**题干文本**，作为搜题的 keyword。
+ *
+ * ## 为什么需要单独一个函数
+ * 错题本列表（`useMistakeBook`）只暴露会话**元数据**
+ * （`title` 是「解析会话」这类自动标题，**不是题干**）。
+ * 要「举一反三」必须拿到**真正的题目原文** —— 它在会话 store 里：
+ * 优先 OCR 结构化结果 `modeState.ocrMeta.question`
+ * （比模型输出更接近题目原文），缺失时回落最后一条 user 消息的 content 块。
+ *
+ * ## 为什么不用 `useAnalysisResultData` 这个 hook
+ * 本函数要在**事件回调**里调用（点「温故新知」时），不是渲染期 —— hook 不适用。
+ * 故直接读 `store.getState()` 并复用同一批**已导出的纯函数**，保证与详情页口径一致。
+ *
+ * ## 防御
+ * 会话不在 map / store 结构异常 / 题干为空 都返回 `null`，**不抛错**。
+ * 调用方据 null 走「没有可用错题」的空态。
+ */
+export function extractQuestionFromSession(
+  sessionId: string,
+  deps: {
+    /** 取 store（注入以便单测；生产传 `sessionManager.get`） */
+    getStore: (id: string) => unknown;
+    /** 从 store 状态取题干的纯函数（注入以便单测） */
+    pickQuestion: (state: unknown) => string | null;
+  },
+): string | null {
+  if (!sessionId) return null;
+  const store = deps.getStore(sessionId) as { getState?: () => unknown } | undefined;
+  if (!store || typeof store.getState !== 'function') return null;
+  try {
+    const q = deps.pickQuestion(store.getState());
+    if (typeof q !== 'string') return null;
+    const trimmed = q.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 把题干压成适合当 `keyword` 的短串。
+ *
+ * ## 为什么要压
+ * 题庄的 `keyword` 是**对 title 与知识点名做匹配**（见 API 文档），不是全文检索。
+ * 把整道题干（可能几百字、含 LaTeX）直接丢进去几乎必然零结果。
+ * 故取**首个有意义片段**并截断：
+ * - 去掉 LaTeX 公式段（`$...$` / `$$...$$`）—— 它们对关键词匹配是噪声
+ * - 去掉题号前缀（「1.」「第1题」）
+ * - 折叠空白，截到 `maxLen`
+ *
+ * ⚠️ 这是**启发式**，不保证命中 —— 故调用方必须处理「零结果」态（换关键词）。
+ */
+export function toSearchKeyword(question: string, maxLen = 30): string {
+  if (typeof question !== 'string') return '';
+  let s = question
+    // 去 LaTeX（行内与块级）
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/\$[^$]*\$/g, ' ')
+    // 去常见题号前缀
+    .replace(/^\s*(?:第\s*\d+\s*题|\d+\s*[.、．)）])\s*/g, '')
+    // 折叠空白
+    .replace(/\s+/g, ' ')
+    .trim();
+  // 去首尾标点（题干常以「（）」「.」开头结尾）
+  s = s.replace(/^[（(【\[、。．，,;；:：]+/, '').replace(/[）)】\]、。．，,;；:：]+$/, '').trim();
+  return s.length > maxLen ? s.slice(0, maxLen) : s;
 }

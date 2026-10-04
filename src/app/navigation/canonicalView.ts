@@ -54,6 +54,9 @@ const BASE_CANONICAL_VIEWS: CurrentView[] = [
   'review-hub',
   // E3：刷题入口页（温故新知 / 自己定类型）。刷题独立于卡片逻辑，故独立视图。
   'practice-hub',
+  // E8：刷题会话页。必须登记，否则 canonicalizeView 会静默落回 chat-v2。
+  // 命名注意：不能用 'practice'（历史废弃名）等 DEPRECATED_VIEW_MAP 里的键。
+  'practice-session',
   // E4：拍题页。study Tab 的落地视图，是「拍题 → 解析 → 错题 → 复习」链路的起点。
   'capture',
   // E5：知识卡片 / 易错点。此前二者共用 flashcards 界面（用户要求分开），

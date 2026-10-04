@@ -71,7 +71,11 @@ describe('deprecated MobileHeader ban contract', () => {
     }
 
     expect(violations).toEqual([]);
-  });
+    // ⏱️ 60s 预算：本用例**递归遍历整个 src 并逐个读源文件**（同步 IO）。
+    // 实测单跑约 3s，但在 vitest 并行跑多个测试文件时（CPU 被抢）会超 5s 默认值
+    // → **假红**（单跑必然通过）。这是测试基建的资源配置，不是被测逻辑问题。
+    // 与 mobileHeaderViewRegistryContract 的同款处理（那里同样给了 60s）。
+  }, 60_000);
 
   it('only lets UnifiedMobileHeader stamp data-mobile-shell="header"', () => {
     // (?<!\[) 放过 CSS 属性选择器 [data-mobile-shell='header'] 与注释中的选择器引用，
@@ -84,5 +88,6 @@ describe('deprecated MobileHeader ban contract', () => {
 
     // 精确等于（而非包含）：既保证唯一来源，也防止统一顶栏丢失打点后测试空转
     expect(stampingFiles).toEqual(['src/components/layout/UnifiedMobileHeader.tsx']);
-  });
+    // ⏱️ 60s 预算：同上一用例，全仓同步 IO 在并行下会超默认 5s → 假红。
+  }, 60_000);
 });

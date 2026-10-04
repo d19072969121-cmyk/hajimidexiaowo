@@ -162,6 +162,11 @@ export const LazyPracticeHubPage = React.lazy(() =>
   import('@/features/practice/pages/PracticeHubPage').then(m => ({ default: m.PracticeHubPage }))
 );
 
+// E8：刷题会话页（温故新知搜同类题 / 自己定类型选范围）—— 用户反馈 ③
+export const LazyPracticeSessionPage = React.lazy(() =>
+  import('@/features/practice/pages/PracticeSessionPage').then(m => ({ default: m.PracticeSessionPage }))
+);
+
 // E4：拍题页。study Tab 落地视图，整条链的起点。
 // 相机能力复用上游的 capture="environment"（纯 Web 标准，无需原生插件）。
 export const LazyCapturePage = React.lazy(() =>

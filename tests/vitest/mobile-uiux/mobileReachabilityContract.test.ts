@@ -68,6 +68,11 @@ const CONTEXTUAL_ENTRY_VIEWS = new Set([
   //    E3 的 practice-hub 是第二例，一并补齐。
   'review-hub',
   'practice-hub',
+  // E8：刷题会话页（用户反馈 ③）。由刷题入口页的 `onStartPractice` 推入
+  // （App.tsx 的 setPracticeSessionMode + setCurrentView('practice-session')），
+  // 是任务流中间态，不占抽屉/命令面板格子 —— 与 practice-hub 同性质。
+  // ⚠️ 漏登记会让本契约报红「unreachable」（App 内 setCurrentView 不被识别）。
+  'practice-session',
   // E4：拍题页。study Tab 的落地视图（TAB_ROOT_VIEW.study='capture'），
   // 本身就是一格 Tab 的根，不经抽屉/命令面板，故登记在此。
   'capture',

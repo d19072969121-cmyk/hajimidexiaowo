@@ -109,6 +109,8 @@ export const VIEW_TO_TABS: Readonly<Record<CurrentView, readonly TabId[]>> = {
   'review-hub': ['review'],
   // E3：刷题入口页（温故新知 / 自己定类型）。刷题归 review Tab。
   'practice-hub': ['review'],
+  // E8：刷题会话页（从刷题入口页推入，同属 review Tab）
+  'practice-session': ['review'],
 
   // media：知识资源与文档阅读
   'learning-hub': ['media'],

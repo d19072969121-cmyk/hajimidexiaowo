@@ -454,6 +454,7 @@ const VIEW_REGISTRY_FILES: Record<string, string> = {
   'analysis-result': 'src/components/analysis/AnalysisResultView.tsx',
   'review-hub': 'src/features/review/pages/ReviewHubPage.tsx',
   'practice-hub': 'src/features/practice/pages/PracticeHubPage.tsx',
+  'practice-session': 'src/features/practice/pages/PracticeSessionPage.tsx',
   'capture': 'src/features/capture/pages/CapturePage.tsx',
   'knowledge-cards': 'src/features/review/pages/KnowledgeCardsPage.tsx',
   'weak-points': 'src/features/review/pages/WeakPointsPage.tsx',
