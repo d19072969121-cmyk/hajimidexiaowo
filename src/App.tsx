@@ -3217,7 +3217,20 @@ function App() {
                   <MobilePageScaffold>
                     <LazyAnalysisResultPage
                       store={analysisResultStore}
-                      onBack={() => setCurrentView('chat-v2')}
+                      // 用户反馈 ①：返回首页时**必须清掉当前会话**。
+                      //
+                      // 拍题链路把 analysis 会话设为了当前会话（见本文件
+                      // captureToAnalysisSession 与 useSessionLifecycle 的同款做法）。
+                      // 若只是切视图而不清，回到首页后 currentSessionId 仍指向
+                      // 那个 analysis 会话 → ChatContainer 取 mode='analysis' →
+                      // 渲染 OcrResultHeader，首页顶部就冒出「视觉 OCR 识别结果」。
+                      // ChatV2Page 已加内容区守卫兜底（不渲染 analysis 会话），
+                      // 但清掉当前会话才是根治：否则会留下一个「存在但不可见」的
+                      // 当前会话，后续发消息、侧栏高亮等都会指向它。
+                      onBack={() => {
+                        sessionManager.setCurrentSessionId(null);
+                        setCurrentView('chat-v2');
+                      }}
                     />
                   </MobilePageScaffold>
                 </Suspense>

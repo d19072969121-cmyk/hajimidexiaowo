@@ -538,6 +538,48 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
   // 🔧 修复：不依赖 currentSessionId，避免与 useEffect 中的 setCurrentSessionId 形成循环
   // 🔧 分组懒加载修复：分别加载已分组会话（全量）和未分组会话（分页），确保每个分组都能显示其会话
   const [currentSessionHasMessages, setCurrentSessionHasMessages] = useState(false);
+
+  /**
+   * 当前会话是否为 analysis（拍题解析）模式 —— 是则**首页不渲染它的内容**。
+   *
+   * ## 为什么需要（用户反馈 ①）
+   * 拍题链路（`App.tsx` 的 `captureToAnalysisSession`）会把新建的 analysis 会话
+   * `sessionManager.setCurrentSessionId(session.id)` 设为**当前会话**，然后切到
+   * `analysis-result` 视图。用户从解析页返回首页（chat-v2）时，
+   * `currentSessionId` **仍是那个 analysis 会话** →
+   * `ChatContainer` 取 `mode === 'analysis'` → `modePlugin.renderHeader` 命中
+   * `OcrResultHeader`（`plugins/modes/analysis.ts:367`）→
+   * **首页内容区顶部出现「视觉 OCR 识别结果」卡片**（题目/答案折叠面板）。
+   * 这正是用户报的「首页出现本应在拍照子页面出现的视觉 OCR 识别结果」。
+   *
+   * ## 与既有设计一致
+   * 首页侧栏本就排除 analysis 会话（`useSessionManagement.ts` 的
+   * `SIDEBAR_EXCLUDE_MODES = ['analysis']`）。内容区此前**缺这层过滤**，
+   * 导致「侧栏看不到、内容区却在渲染」的不一致。此守卫补上内容区一侧。
+   *
+   * analysis 会话的正当展示位是 `analysis-result` 视图（它用
+   * `useActiveChatStore()` 独立取 store，不受本守卫影响）。
+   */
+  const [currentSessionIsAnalysis, setCurrentSessionIsAnalysis] = useState(false);
+
+  useEffect(() => {
+    if (!currentSessionId) {
+      setCurrentSessionIsAnalysis(false);
+      return;
+    }
+    const store = sessionManager.get(currentSessionId);
+    if (!store) {
+      setCurrentSessionIsAnalysis(false);
+      return;
+    }
+    const read = (): boolean => store.getState().mode === 'analysis';
+    setCurrentSessionIsAnalysis(read());
+    // 响应式：会话切换 / 模式变更都要更新（如从 analysis 会话切到普通会话）
+    const unsubscribe = store.subscribe((state, prevState) => {
+      if (state.mode !== prevState.mode) setCurrentSessionIsAnalysis(read());
+    });
+    return unsubscribe;
+  }, [currentSessionId]);
   
   useEffect(() => {
     if (!currentSessionId) {
@@ -1287,7 +1329,7 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
             setMobileResourcePanelOpen(true);
           } : undefined}
         />
-      ) : currentSessionId ? (
+      ) : currentSessionId && !currentSessionIsAnalysis ? (
         <ChatContainer
           sessionId={currentSessionId}
           className="flex-1 h-full"
