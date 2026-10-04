@@ -139,6 +139,12 @@ export function useChatV2Stats(autoRefresh = false, refreshInterval = 30000, act
   const loadStats = useCallback(async () => {
     try {
       // 获取所有会话
+      //
+      // ⚠️ 此处**刻意不带** `excludeModes`（与首页侧栏相反）。
+      // 本 hook 是「统计」用途（总会话数、近 7 天活跃度等），需要**全量数据**；
+      // 若照搬首页口径排除 analysis，拍题会话不计入统计 → 数字偏小。
+      // 判定依据：口径服从用途——首页浏览常规对话（排除），统计与存档管理
+      // （枚举全部）不排除。测试见 e5LegacyFixes.test.ts 的「按用途分流」组。
       const [activeSessions, archivedSessions] = await Promise.all([
         invoke<ChatSession[]>('chat_v2_list_sessions', {
           status: 'active',

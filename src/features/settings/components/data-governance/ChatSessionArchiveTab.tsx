@@ -50,6 +50,17 @@ export const ChatSessionArchiveTab: React.FC = () => {
         const allSessions: ChatSession[] = [];
         let offset = 0;
         while (true) {
+          /**
+           * ⚠️ 此处**刻意不带** `excludeModes`（与首页侧栏相反）。
+           *
+           * 本页是「存档管理」：用户要能看到并删除自己**全部**归档会话。
+           * 若照搬首页口径排除 `analysis`，归档的拍题会话会在此**不可见、也删不掉**，
+           * 数据将永久残留。
+           *
+           * 判断依据：口径应服从**用途**——首页是「浏览常规对话」（排除拍题），
+           * 本页是「枚举与管理全部归档」（不排除）。同理 `useChatV2Stats` 做统计
+           * 时也不排除（排除会导致统计少算）。
+           */
           const page = await invoke<ChatSession[]>('chat_v2_list_sessions', {
             status: 'archived',
             limit: ARCHIVED_SESSIONS_PAGE_SIZE,

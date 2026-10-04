@@ -21,6 +21,54 @@ function stripComments(src: string): string {
 
 const read = (p: string) => stripComments(readFileSync(resolve(process.cwd(), p), 'utf8'));
 
+/**
+ * 抽取文件里每个 `chat_v2_list_sessions` / `chat_v2_count_sessions` 调用点的源码片段。
+ *
+ * ## 两次失败尝试（都实测过，记录以免重蹈）
+ * ① 固定窗口正则 `/…'[\s\S]{0,260}?}\)/g`：
+ *    非贪婪匹配到首个 `})` + 260 字符上限。参数块超长时会**整条匹配不到、
+ *    静默丢弃**（漏检）。审查员实测构造 >260 字符的调用点 → 匹配数归零。
+ * ② 圆括号配对（从命令名位置起数 `(`/`)`）：
+ *    **更糟**——真正的外层 `(` 在 `invoke<...>(` 里、位于命令名**之前**，
+ *    于是 depth 从 0 起永远配不平，把后续多个调用**吞进同一片段**
+ *    （实测抽出 2420 字符片段，真实调用约 200）。
+ *    后果：`/excludeModes/` 在吞并范围内任意命中即绿——正是「任意一处命中即过」
+ *    的老毛病复活，且**首屏漏改会被漏检**。防空断言也拦不住（吞并时抽取数
+ *    仍等于出现次数）。
+ *
+ * ## 现做法：**花括号配对**
+ * 参数是对象字面量，`{` 与 `}` 天然一对，既不会吞并也不会被长度撑破。
+ * 从命令名后第一个 `{` 起配对到其闭合 `}`。
+ */
+function extractInvokeSites(src: string): string[] {
+  const sites: string[] = [];
+  const marker = /chat_v2_(?:list|count)_sessions'/g;
+  let m: RegExpExecArray | null;
+  while ((m = marker.exec(src)) !== null) {
+    const braceStart = src.indexOf('{', m.index);
+    if (braceStart < 0) continue;
+    let depth = 0;
+    let i = braceStart;
+    for (; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) { i += 1; break; }
+      }
+    }
+    sites.push(src.slice(m.index, Math.min(i, src.length)));
+  }
+  return sites;
+}
+
+/** 文件里这两个命令出现的次数（用于防空断言） */
+function countInvokeMentions(src: string): number {
+  return (src.match(/chat_v2_(?:list|count)_sessions'/g) ?? []).length;
+}
+
+
+
 describe('E5 ③ 文字错位：解析卡片必须允许长内容换行/滚动', () => {
   const code = read('src/components/analysis/AnalysisResultView.tsx');
 
@@ -117,8 +165,24 @@ describe('E5 ① 拍题不污染首页：列表与计数必须同口径', () => 
     ]) {
       const src = read(file);
       // 截取每个调用点到其闭合 `})` 为止的片段（取足够窗口，覆盖参数字面量）
-      const calls = src.match(/chat_v2_(?:list|count)_sessions'[\s\S]{0,260}?\}\)/g) ?? [];
-      expect(calls.length, `${file} 未找到任何调用`).toBeGreaterThan(0);
+      const calls = extractInvokeSites(src);
+      // 防空断言（两道，缺一不可）：
+      // 1) 抽取数 == 命令出现次数 —— 拦住「有调用点完全没被抽到」
+      expect(
+        calls.length,
+        `${file} 抽取到 ${calls.length} 处调用，但文件里有 ${countInvokeMentions(src)} 处命令出现——`
+        + `可能存在未被抽取的调用点（这会静默漏检）`,
+      ).toBe(countInvokeMentions(src));
+      // 2) 每个片段内命令字面量恰好 1 次 —— 拦住「多个调用被吞进同一片段」
+      //    （只靠断言 1 拦不住：吞并时抽取数仍等于出现数）
+      for (const call of calls) {
+        expect(
+          countInvokeMentions(call),
+          `${file} 的某个抽取片段包含 ${countInvokeMentions(call)} 个命令调用（应恰好 1 个）——`
+          + `说明配对吞并了相邻调用，断言会因此漏检（片段长度 ${call.length}）`,
+        ).toBe(1);
+      }
+      expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) {
         expect(
           call,
@@ -133,5 +197,56 @@ describe('E5 ① 拍题不污染首页：列表与计数必须同口径', () => 
     const listCall = book.match(/chat_v2_list_sessions[\s\S]{0,300}?\}\)/)?.[0] ?? '';
     expect(listCall, '未找到错题本的列表调用').not.toBe('');
     expect(listCall, '错题本不得排除 analysis——那正是它要查的模式').not.toMatch(/excludeModes/);
+  });
+});
+
+describe('E5 ① 会话列表口径：按用途分流（收录判定依据，防后人误改）', () => {
+  /**
+   * 口径规则（交叉审查两轮后收敛）：
+   *   排除 analysis —— 首页/侧栏「浏览常规对话」
+   *   不排除       —— 错题本（要查 analysis）、统计（需全量）、存档管理（要能删）
+   *
+   * 本组断言把「谁该带、谁不该带」固化。若后人为了「统一口径」而一刀切，
+   * 会立刻红，并指向此处的判定依据。
+   */
+  const EXPECT_EXCLUDE = [
+    'src/features/chat/hooks/useSessionManagement.ts',
+    'src/features/chat/pages/useSessionLifecycle.ts',
+  ];
+  const EXPECT_NO_EXCLUDE = [
+    'src/features/review/hooks/useMistakeBook.ts',       // 要查 analysis
+    'src/hooks/useChatV2Stats.ts',                        // 统计需全量
+    'src/features/settings/components/data-governance/ChatSessionArchiveTab.tsx', // 存档管理要能删
+  ];
+
+  for (const file of EXPECT_NO_EXCLUDE) {
+    it(`${file} 不得排除 analysis（按用途分流）`, () => {
+      const src = read(file);
+      const calls = extractInvokeSites(src);
+      expect(
+        calls.length,
+        `${file} 抽取到 ${calls.length} 处调用，但文件里有 ${countInvokeMentions(src)} 处命令出现`,
+      ).toBe(countInvokeMentions(src));
+      for (const call of calls) {
+        expect(
+          countInvokeMentions(call),
+          `${file} 某个抽取片段含 ${countInvokeMentions(call)} 个调用（应恰好 1 个）——配对吞并`,
+        ).toBe(1);
+      }
+      expect(calls.length).toBeGreaterThan(0);
+      for (const call of calls) {
+        expect(
+          call,
+          `${file} 带了 excludeModes，但这处的用途需要全量（见本组测试开头的口径规则）：`
+          + `\n${call.slice(0, 160)}`,
+        ).not.toMatch(/excludeModes/);
+      }
+    });
+  }
+
+  it('三个「不排除」文件都在测试覆盖内（防漏收录）', () => {
+    // 若将来新增了别的调用文件，应显式判断它属于哪一类并加进对应数组
+    const expected = [...EXPECT_EXCLUDE, ...EXPECT_NO_EXCLUDE];
+    expect(expected.length).toBe(5);
   });
 });

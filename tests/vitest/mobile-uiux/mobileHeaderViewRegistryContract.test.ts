@@ -139,7 +139,15 @@ describe('mobile header view registry contract', () => {
       .map(({ file, viewId }) => `${file} 使用了非法 viewId '${viewId}'`);
 
     expect(violations).toEqual([]);
-  }, 30_000);
+    // ⏱️ 60s 预算：本用例要**递归遍历整个 src 并逐个读源文件**（同步 IO）。
+    // 实测耗时随机器负载剧烈波动：
+    //   - 单独跑：约 4.7~5.1s
+    //   - 与 20 个测试文件并行（本仓库全量跑时就是这种负载）：曾超 30s
+    // 30s 曾够用，但并行压力更大时仍会**假红**（单独跑必然通过）。
+    // 这是测试基建的资源配置，不是被测逻辑的问题——不要为了「跑得快」调小。
+    // 若将来要根治，应把「读全仓」改成构建期静态收集（如 import.meta.glob），
+    // 但那会改变测试的加载语义，需单独评估。
+  }, 60_000);
 
   it('keeps an App.tsx fallback label entry for every CurrentView', () => {
     const appSource = readSource('src/App.tsx');
