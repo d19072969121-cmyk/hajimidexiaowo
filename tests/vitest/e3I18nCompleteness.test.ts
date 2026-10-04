@@ -114,6 +114,30 @@ const CASES: Array<{
       'en-US': 'src/locales/en-US/common.json',
     },
   },
+  {
+    // E5：知识卡片页。交叉审查第二轮再次发现同一类洞——本闸门每次都只
+    // 补「上一次事故涉及的那一页」，新页面又要等下次事故才被想起。
+    // 故 E5 一并把两个新页面都登记，且建议此后新增视图时同步补此表。
+    label: 'KnowledgeCardsPage → knowledgeCards.*',
+    source: 'src/features/review/pages/KnowledgeCardsPage.tsx',
+    ns: 'knowledgeCards',
+    prefix: 'knowledgeCards',
+    localeFiles: {
+      'zh-CN': 'src/locales/zh-CN/common.json',
+      'en-US': 'src/locales/en-US/common.json',
+    },
+  },
+  {
+    // E5：易错点页。
+    label: 'WeakPointsPage → weakPoints.*',
+    source: 'src/features/review/pages/WeakPointsPage.tsx',
+    ns: 'weakPoints',
+    prefix: 'weakPoints',
+    localeFiles: {
+      'zh-CN': 'src/locales/zh-CN/common.json',
+      'en-US': 'src/locales/en-US/common.json',
+    },
+  },
 ];
 
 describe('E3 i18n 完整性契约：组件里用到的 key 必须在语言文件中存在', () => {

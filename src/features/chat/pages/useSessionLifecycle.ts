@@ -64,11 +64,16 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
     t, PAGE_SIZE, LAST_SESSION_KEY,
   } = deps;
 
+  // 与 useSessionManagement 的列表口径保持一致：拍题（analysis）会话不进首页计数，
+  // 否则「列表已排除、计数没排除」会让总数偏大、hasMore 判断错误（翻到空页）。
+  const SIDEBAR_EXCLUDE_MODES = ['analysis'];
+
   const loadUngroupedCount = useCallback(async () => {
     try {
       const count = await invoke<number>('chat_v2_count_sessions', {
         status: 'active',
         groupId: '',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
       });
       setUngroupedSessionCount(count);
     } catch (error) {
@@ -270,6 +275,7 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
         invoke<ChatSession[]>('chat_v2_list_sessions', {
           status: 'active',
           groupId: '*',
+          excludeModes: SIDEBAR_EXCLUDE_MODES,
           limit: 10000,
           offset: 0,
         }),
@@ -277,11 +283,16 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
         invoke<ChatSession[]>('chat_v2_list_sessions', {
           status: 'active',
           groupId: '',
+          excludeModes: SIDEBAR_EXCLUDE_MODES,
           limit: PAGE_SIZE,
           offset: 0,
         }),
-        invoke<number>('chat_v2_count_sessions', { status: 'active' }),
-        invoke<number>('chat_v2_count_sessions', { status: 'active', groupId: '' }),
+        invoke<number>('chat_v2_count_sessions', {
+          status: 'active', excludeModes: SIDEBAR_EXCLUDE_MODES,
+        }),
+        invoke<number>('chat_v2_count_sessions', {
+          status: 'active', groupId: '', excludeModes: SIDEBAR_EXCLUDE_MODES,
+        }),
       ]);
 
       const allSessions = [...groupedResult, ...ungroupedResult]
@@ -331,6 +342,7 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
       const result = await invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
         groupId: '',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
         limit: PAGE_SIZE,
         offset: currentUngroupedLoaded,
       });

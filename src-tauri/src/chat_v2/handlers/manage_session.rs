@@ -550,16 +550,25 @@ pub async fn chat_v2_list_sessions(
 pub async fn chat_v2_count_sessions(
     status: Option<String>,
     group_id: Option<String>,
+    exclude_modes: Option<Vec<String>>,
     db: State<'_, Arc<ChatV2Database>>,
 ) -> Result<u32, String> {
     log::debug!(
-        "[ChatV2::handlers] chat_v2_count_sessions: status={:?}, group_id={:?}",
+        "[ChatV2::handlers] chat_v2_count_sessions: status={:?}, group_id={:?}, exclude_modes={:?}",
         status,
-        group_id
+        group_id,
+        exclude_modes
     );
 
-    let count = ChatV2Repo::count_sessions_v2(&db, status.as_deref(), group_id.as_deref())
-        .map_err(String::from)?;
+    // exclude_modes 必须与 chat_v2_list_sessions 传同一份，否则「列表已排除、
+    // 计数没排除」会导致总数偏大、前端 hasMore 判断错误。
+    let count = ChatV2Repo::count_sessions_v2_excluding(
+        &db,
+        status.as_deref(),
+        group_id.as_deref(),
+        exclude_modes.as_deref(),
+    )
+    .map_err(String::from)?;
 
     Ok(count)
 }

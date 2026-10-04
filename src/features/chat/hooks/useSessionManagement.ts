@@ -72,6 +72,21 @@ export interface SidebarSessionData {
 
 const SIDEBAR_REFRESH_DEBOUNCE_MS = 120;
 
+/**
+ * 首页/侧栏会话列表排除的模式。
+ *
+ * 拍题（analysis）会话是真实内容（错题本的数据来源），但语义上属于「错题本」
+ * 而非「常规对话」，出现在首页会挤占列表且用户难以理解。
+ *
+ * ⚠️ **本文件内每一处 `chat_v2_list_sessions` 调用都必须带上它**——
+ *    只改首屏、漏改分页（loadMoreUngrouped / loadMoreSessions）会导致
+ *    「首屏干净、翻第二页 analysis 会话又出现」，这是修复不完整最典型的形态。
+ *
+ * 排除规则由**调用方**决定：错题本（useMistakeBook）不传该参数，
+ * 因此仍能查到 analysis 会话。
+ */
+const SIDEBAR_EXCLUDE_MODES = ['analysis'];
+
 export function useSidebarSessionData(): SidebarSessionData {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [groups, setGroups] = useState<SessionGroup[]>([]);
@@ -87,13 +102,6 @@ export function useSidebarSessionData(): SidebarSessionData {
 
   const refresh = useCallback(async () => {
     const generation = ++refreshGenerationRef.current;
-    // 首页/侧栏的会话列表排除拍题（analysis）会话。
-    //
-    // 拍题会话是真实内容（错题本的来源），但语义上属于「错题本」而非
-    // 「常规对话」，出现在首页会挤占列表且用户难以理解。
-    // 排除规则由**调用方**决定：错题本（useMistakeBook）不传该参数，
-    // 因此仍能查到 analysis 会话。
-    const SIDEBAR_EXCLUDE_MODES = ['analysis'];
     const [groupedResult, ungroupedResult, groupsResult] = await Promise.allSettled([
       invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
@@ -154,6 +162,7 @@ export function useSidebarSessionData(): SidebarSessionData {
       const result = await invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
         groupId: '',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
         limit: SESSION_LIST_PAGE_SIZE,
         offset,
       });
@@ -241,6 +250,7 @@ export function useSessionManagement() {
     try {
       const result = await invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
         limit: SESSION_LIST_PAGE_SIZE,
         offset: 0,
       });
@@ -275,6 +285,7 @@ export function useSessionManagement() {
     try {
       const result = await invoke<ChatSession[]>('chat_v2_list_sessions', {
         status: 'active',
+        excludeModes: SIDEBAR_EXCLUDE_MODES,
         limit: SESSION_LIST_PAGE_SIZE,
         offset: sessions.length,
       });

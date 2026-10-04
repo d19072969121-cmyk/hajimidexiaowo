@@ -203,7 +203,7 @@ impl SessionToolExecutor {
 
         let sessions = ChatV2Repo::list_sessions_with_conn(&conn, status, group_id, None, limit, offset)
             .map_err(|e| e.to_string())?;
-        let total = ChatV2Repo::count_sessions_with_conn(&conn, status, group_id)
+        let total = ChatV2Repo::count_sessions_with_conn(&conn, status, group_id, None)
             .map_err(|e| e.to_string())?;
 
         let tags_map = if include_tags {
@@ -644,22 +644,22 @@ impl SessionToolExecutor {
         let db = Self::get_db(ctx)?;
         let conn = db.get_conn_safe().map_err(|e| e.to_string())?;
 
-        let active = ChatV2Repo::count_sessions_with_conn(&conn, Some("active"), None)
+        let active = ChatV2Repo::count_sessions_with_conn(&conn, Some("active"), None, None)
             .map_err(|e| e.to_string())?;
-        let archived = ChatV2Repo::count_sessions_with_conn(&conn, Some("archived"), None)
+        let archived = ChatV2Repo::count_sessions_with_conn(&conn, Some("archived"), None, None)
             .map_err(|e| e.to_string())?;
-        let deleted = ChatV2Repo::count_sessions_with_conn(&conn, Some("deleted"), None)
+        let deleted = ChatV2Repo::count_sessions_with_conn(&conn, Some("deleted"), None, None)
             .map_err(|e| e.to_string())?;
 
         let groups = ChatV2Repo::list_groups_with_conn(&conn, Some("active"), None)
             .map_err(|e| e.to_string())?;
 
         let ungrouped =
-            ChatV2Repo::count_sessions_with_conn(&conn, Some("active"), Some("")).unwrap_or(0);
+            ChatV2Repo::count_sessions_with_conn(&conn, Some("active"), Some(""), None).unwrap_or(0);
 
         let mut group_stats: Vec<Value> = Vec::new();
         for g in &groups {
-            let count = ChatV2Repo::count_sessions_with_conn(&conn, Some("active"), Some(&g.id))
+            let count = ChatV2Repo::count_sessions_with_conn(&conn, Some("active"), Some(&g.id), None)
                 .unwrap_or(0);
             group_stats.push(json!({
                 "groupId": g.id,

@@ -644,16 +644,32 @@ impl ChatV2Repo {
     /// ## 参数
     /// - `conn`: 数据库连接
     /// - `status`: 可选的状态过滤（active/archived/deleted）
+    /// - `exclude_modes`: 需排除的模式，**必须与 list_sessions_with_conn 传同一份**。
+    ///   否则会出现「列表已排除 analysis 但计数没排除」→ 计数偏大 →
+    ///   前端 hasMore/总数显示错误，用户可能翻到空页。
     ///
     /// 🔧 2026-01-20: 过滤掉 mode='agent' 的 Worker 会话
     pub fn count_sessions_with_conn(
         conn: &Connection,
         status: Option<&str>,
         group_id: Option<&str>,
+        exclude_modes: Option<&[String]>,
     ) -> ChatV2Result<u32> {
         let mut sql = String::from("SELECT COUNT(*) FROM chat_v2_sessions WHERE mode != 'agent'");
         Self::append_visible_session_filter(&mut sql);
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        // 与 list_sessions_with_conn 保持同一口径（见函数文档）
+        if let Some(modes) = exclude_modes {
+            let valid: Vec<&String> = modes.iter().filter(|m| !m.trim().is_empty()).collect();
+            if !valid.is_empty() {
+                let placeholders = vec!["?"; valid.len()].join(", ");
+                sql.push_str(&format!(" AND mode NOT IN ({})", placeholders));
+                for m in valid {
+                    params_vec.push(Box::new(m.clone()));
+                }
+            }
+        }
 
         if let Some(s) = status {
             sql.push_str(" AND persist_status = ?");
@@ -3477,8 +3493,21 @@ impl ChatV2Repo {
         status: Option<&str>,
         group_id: Option<&str>,
     ) -> ChatV2Result<u32> {
+        Self::count_sessions_v2_excluding(db, status, group_id, None)
+    }
+
+    /// 同 `count_sessions_v2`，但可指定要排除的模式。
+    ///
+    /// **必须与 `list_sessions_v2_excluding` 传同一份 exclude_modes**，
+    /// 否则计数与列表口径不一致（见 `count_sessions_with_conn` 文档）。
+    pub fn count_sessions_v2_excluding(
+        db: &ChatV2Database,
+        status: Option<&str>,
+        group_id: Option<&str>,
+        exclude_modes: Option<&[String]>,
+    ) -> ChatV2Result<u32> {
         let conn = db.get_conn_safe()?;
-        Self::count_sessions_with_conn(&conn, status, group_id)
+        Self::count_sessions_with_conn(&conn, status, group_id, exclude_modes)
     }
 
     /// 创建消息（使用 ChatV2Database）
