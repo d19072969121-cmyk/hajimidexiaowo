@@ -165,6 +165,7 @@ import {
   LazyCapturePage,
   LazyKnowledgeCardsPage,
   LazyWeakPointsPage,
+  LazyMistakeDetailPage,
   LazyCrepeDemoPage,
   LazyChatV2IntegrationTest,
   LazyLLMOutputPlayground,
@@ -1166,6 +1167,17 @@ function App() {
   // 这里用响应式桥接 hook 取当前会话 store（只读不创建）；解析会话创建后
   // sessionManager 会发 session-created，hook 重取，页面自然从空态过渡到内容态。
   const analysisResultStore = useActiveChatStore();
+
+  /**
+   * E6：当前打开的错题会话 id（错题详情页用来取/写标签）。
+   *
+   * 为什么不只依赖 store 的 sessionId：详情页是 review-hub 推入的二级页，
+   * 其标签读写需要**明确的**目标会话标识。会话切换是异步的（先
+   * `navigate-to-session` 握手、store 再异步加载），直接读 store 的
+   * sessionId 在首帧可能仍是上一个会话，导致「给别的错题加标签」。
+   * 显式记下用户点的那一条，语义无歧义。
+   */
+  const [openedMistakeSessionId, setOpenedMistakeSessionId] = useState<string | null>(null);
 
 
   // 包装 setCurrentView，添加视图切换追踪 + LRU 淘汰
@@ -2690,6 +2702,7 @@ function App() {
       'capture': t('common:navigation.capture', '拍题'),
       'knowledge-cards': t('common:navigation.knowledge_cards', '知识卡片'),
       'weak-points': t('common:navigation.weak_points', '易错点'),
+      'mistake-detail': t('common:navigation.mistake_detail', '错题详情'),
     };
 
     return labels[currentView] ?? t('common:app.default_header');
@@ -3157,7 +3170,11 @@ function App() {
 
               {renderViewLayer('settings', settingsContent, 'overflow-hidden')}
 
-              {/* 🎯 Phase 5 清理：mistake-detail 视图已移除，统一由 ChatViewWithSidebar 处理 */}
+              {/* E6 说明：错题详情视图曾在 2026-01 的 Phase 5 清理中被移除，
+                  其视图名 'mistake-detail' 当时留在了 canonicalView.ts 的
+                  DEPRECATED_VIEW_MAP 里重定向到 chat-v2。E6 把它**复活**为
+                  独立的错题详情页，并已删除该重定向键——渲染挂载点见下方
+                  renderViewLayer('mistake-detail', ...)。 */}
               {/* 🎯 2026-01: llm-usage-stats 视图已移除，统计数据已整合到 DataStats 页面 */}
 
               {/* 制卡任务管理页面 */}
@@ -3213,21 +3230,26 @@ function App() {
                   <MobilePageScaffold>
                     <LazyReviewHubPage
                       onNavigate={setCurrentView}
-                      // E5：点开某条错题 → 进该会话的解析结果页。
+                      // E5→E6：点开某条错题 → 进**错题详情独立页**。
                       //
-                      // 顺序与 E4 拍题链路一致（那次踩过坑）：
+                      // 顺序与原 E4/E5 链路一致（那次踩过坑，**不要改顺序**）：
                       //   1) 先让 ChatV2Page 知情并切换会话——走既有导航握手
                       //      事件 `navigate-to-session`（ModernSidebar 等同款用法）。
                       //      ChatV2Page 的 handler 会调**包装版** setCurrentSessionId，
                       //      从而驱动 ChatContainer → useTauriAdapter → adapter setup，
                       //      使该会话的正文（解析内容）真正加载出来。
-                      //      若绕过它直接调 sessionManager，解析页会永久转圈。
-                      //   2) 再切到解析结果页。
+                      //      若绕过它直接调 sessionManager，详情页会永久转圈。
+                      //   2) 记下目标会话 id（详情页标签读写要用，见 openedMistakeSessionId）。
+                      //   3) 再切到错题详情页。
+                      //
+                      // E6 相较 E5 的唯一变化：第 3 步的目标视图由 'analysis-result'
+                      // 改为 'mistake-detail'。前两步**必须保留**。
                       onOpenMistake={(sessionId) => {
                         window.dispatchEvent(new CustomEvent('navigate-to-session', {
                           detail: { sessionId },
                         }));
-                        setCurrentView('analysis-result');
+                        setOpenedMistakeSessionId(sessionId);
+                        setCurrentView('mistake-detail');
                       }}
                     />
                   </MobilePageScaffold>
@@ -3289,6 +3311,28 @@ function App() {
                       // 深链到 设置 → 模型 Tab（题库配置区挂在 ModelsTab 内）。
                       // 必须走 setPendingSettingsRoute + SETTINGS_NAVIGATE_TAB：
                       // 题设置页可能尚未挂载，仅 setCurrentView 会落在首屏而非 models。
+                      onConfigureQuestionBank={() => {
+                        const route = { tab: 'models' as const };
+                        setPendingSettingsRoute(route);
+                        dispatchAppEvent(APP_EVENTS.SETTINGS_NAVIGATE_TAB, route);
+                        setCurrentView('settings');
+                      }}
+                    />
+                  </MobilePageScaffold>
+                </Suspense>
+              ))}
+
+              {/* E6 错题详情独立页：从 review-hub 点开某条错题后进入。
+                  此前该操作切到 'analysis-result'（「刚拍完的即时结果」），
+                  语义不对——用户从错题本点进来时的心智是「回顾一道历史错题」。
+                  本页是 review-hub 的二级页，故有真实返回途径（回 review-hub）。 */}
+              {renderViewLayer('mistake-detail', (
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <MobilePageScaffold>
+                    <LazyMistakeDetailPage
+                      store={analysisResultStore}
+                      sessionId={openedMistakeSessionId}
+                      onBack={() => setCurrentView('review-hub')}
                       onConfigureQuestionBank={() => {
                         const route = { tab: 'models' as const };
                         setPendingSettingsRoute(route);

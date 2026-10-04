@@ -1890,6 +1890,12 @@ pub fn run() {
             // 移动端支撑：图片压缩（上传前减载）+ 网络质量探测（弱网降级）
             crate::cmd::media::compress_image,
             crate::cmd::network::network_probe,
+            // 题庄外部题库 HTTP 客户端（刷题/找同类题的数据源）
+            crate::cmd::question_bank::question_bank_get_quota,
+            crate::cmd::question_bank::question_bank_list_meta,
+            crate::cmd::question_bank::question_bank_trial_status,
+            crate::cmd::question_bank::question_bank_ensure_trial,
+            crate::cmd::question_bank::question_bank_search_questions,
             // 状态恢复相关命令
             crate::commands::get_recent_document_tasks,
             crate::commands::get_all_recent_cards,

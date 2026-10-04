@@ -19,6 +19,7 @@ pub mod notes;
 pub mod ocr;
 pub mod openai_codex;
 pub mod power;
+pub mod question_bank; // 题庄外部题库 HTTP 客户端
 pub mod textbooks;
 pub mod translation;
 pub mod web_search; // OCR 引擎配置命令

@@ -457,6 +457,10 @@ const VIEW_REGISTRY_FILES: Record<string, string> = {
   'capture': 'src/features/capture/pages/CapturePage.tsx',
   'knowledge-cards': 'src/features/review/pages/KnowledgeCardsPage.tsx',
   'weak-points': 'src/features/review/pages/WeakPointsPage.tsx',
+  // E6：错题详情独立页。由 review-hub 推入的二级页（点开某条错题）。
+  // 差异化于 knowledge-cards/weak-points：本页**有**真实上一页语义
+  // （去处 = review-hub），故走 showBackArrow 分支，**不进** hub 白名单。
+  'mistake-detail': 'src/features/review/pages/MistakeDetailPage.tsx',
 };
 
 /** MobileHeaderContext 的 JSDoc 里有 useMobileHeader('settings', ...) 等示例注释，排除该文件 */

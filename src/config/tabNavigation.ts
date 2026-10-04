@@ -99,6 +99,8 @@ export const VIEW_TO_TABS: Readonly<Record<CurrentView, readonly TabId[]>> = {
   // review：知识卡片与易错点（E5 起分开）。二者都是 review Tab 的二级页。
   'knowledge-cards': ['review'],
   'weak-points': ['review'],
+  // E6：错题详情独立页。由 review-hub 推入的二级页，同属 review Tab。
+  'mistake-detail': ['review'],
 
   // review：制卡产出 → 闪卡消化
   'flashcards': ['review'],

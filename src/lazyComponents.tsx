@@ -177,6 +177,14 @@ export const LazyWeakPointsPage = React.lazy(() =>
   import('@/features/review/pages/WeakPointsPage').then(m => ({ default: m.WeakPointsPage }))
 );
 
+// E6：错题详情独立页。此前点错题复用 analysis-result（「刚拍完的即时结果」），
+// 语义不对——本页是「历史错题回顾」，故独立成页。
+// 视图 id 用 mistake-detail：它曾是该表式的历史废弃名（重定向 chat-v2），
+// 本次已在 canonicalView.ts 删除该重定向键后复活。
+export const LazyMistakeDetailPage = React.lazy(() =>
+  import('@/features/review/pages/MistakeDetailPage').then(m => ({ default: m.MistakeDetailPage }))
+);
+
 // 开发专用组件：生产构建中 import.meta.env.DEV 为 false，动态 import 被 Rollup 死代码消除
 const DevNull: React.FC<any> = () => null;
 const devLazy = () => Promise.resolve({ default: DevNull as React.ComponentType<any> });

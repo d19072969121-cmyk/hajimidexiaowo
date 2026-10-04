@@ -74,6 +74,14 @@ const CONTEXTUAL_ENTRY_VIEWS = new Set([
   // E5：知识卡片 / 易错点。由 review-hub 推入的二级页，同 analysis-result 性质。
   'knowledge-cards',
   'weak-points',
+  // E6：错题详情独立页。由 review-hub 的错题条目推入（App.tsx 的
+  // `onOpenMistake` → setCurrentView('mistake-detail')），是任务流中间态，
+  // 不占抽屉/命令面板格子 —— 与 analysis-result / review-hub 同性质。
+  // ⚠️ 漏登记会让本契约报红「unreachable」：契约只认「抽屉 / 命令面板 /
+  //    本白名单」三桶，App 内的 setCurrentView 调用**不被**它识别
+  //    （正则只扫 command-palette 的 deps.navigate 与导航项的 view:）。
+  //    E1 的 review-hub、E3 的 practice-hub 都因此长期红灯，本页是第三例。
+  'mistake-detail',
 ]);
 
 /** 匹配 view: 'xxx'（含 view: 'xxx' as CurrentView / as NavViewType） */
@@ -83,6 +91,54 @@ const PALETTE_NAVIGATE_LITERAL = /deps\.navigate\(\s*'([a-z0-9-]+)'/g;
 
 const collectMatches = (source: string, pattern: RegExp): string[] =>
   [...source.matchAll(pattern)].map((match) => match[1]);
+
+/**
+ * 词法感知地剥离注释（只清注释，字符串/模板串原样保留）。
+ *
+ * 为什么需要：本文件若干断言要「在源码里抽字面量」，而注释里常**说明性地**
+ * 点名某些视图名（例如「新视图不能叫 review」）。不剥注释就会把说明文字
+ * 当成真实代码 → 假违规。判据必须建立在真实代码上。
+ *
+ * 与 `mobileHeaderViewRegistryContract.test.ts` 的同名 helper 是同一套做法
+ * （单趟扫描 + 状态机），此处按最小必要实现——本文件不需要处理模板串嵌套。
+ */
+const stripComments = (src: string): string => {
+  let out = '';
+  let i = 0;
+  type State = 'code' | 'line' | 'block' | 'single' | 'double' | 'template';
+  let state: State = 'code';
+  while (i < src.length) {
+    const ch = src[i];
+    const next = src[i + 1];
+    if (state === 'code') {
+      if (ch === '/' && next === '/') { state = 'line'; i += 2; continue; }
+      if (ch === '/' && next === '*') { state = 'block'; i += 2; continue; }
+      if (ch === "'") { state = 'single'; out += ch; i += 1; continue; }
+      if (ch === '"') { state = 'double'; out += ch; i += 1; continue; }
+      if (ch === '`') { state = 'template'; out += ch; i += 1; continue; }
+      out += ch; i += 1; continue;
+    }
+    if (state === 'line') {
+      if (ch === '\n') { state = 'code'; out += ch; i += 1; continue; }
+      i += 1; continue;
+    }
+    if (state === 'block') {
+      if (ch === '*' && next === '/') { state = 'code'; i += 2; continue; }
+      i += 1; continue;
+    }
+    // 字符串态：处理转义，避免 `\'` 提前收尾
+    if (ch === '\\') { out += ch + (next ?? ''); i += 2; continue; }
+    if (
+      (state === 'single' && ch === "'")
+      || (state === 'double' && ch === '"')
+      || (state === 'template' && ch === '`')
+    ) {
+      state = 'code'; out += ch; i += 1; continue;
+    }
+    out += ch; i += 1;
+  }
+  return out;
+};
 
 /** 解析 config/navigation.ts 的 MOBILE_APP_LAUNCHER_VIEWS 数组（移动抽屉启动器入口） */
 const parseLauncherViews = (sharedNavSource: string): string[] => {
@@ -171,5 +227,49 @@ describe('mobile reachability contract', () => {
 
     expect(unreachable).toEqual([]);
     expect(orphanedRedirects).toEqual([]);
+  });
+
+  /**
+   * 复活视图不得同时留在 DEPRECATED_VIEW_MAP（E6 新增，锁死一类静默失效）。
+   *
+   * ## 为什么单独立一条（这是真踩到的坑，不是假想）
+   * `canonicalizeView` 的实现是**先查重定向表、再查规范集**：
+   * ```ts
+   * const mapped = DEPRECATED_VIEW_MAP[view] ?? view;
+   * return CANONICAL_VIEWS.has(mapped) ? mapped : 'chat-v2';
+   * ```
+   * 于是「把一个历史废弃视图名复活成真实视图」时，如果只做了
+   * `BASE_CANONICAL_VIEWS.push(view)` 而**忘了删重定向键**，运行时会先命中
+   * 重定向、把用户悄悄送到 `chat-v2`。
+   *
+   * E6 的 `mistake-detail` 正是这种情形：它原本在重定向表里指向 chat-v2。
+   * 本用例把「已登记进 canonical 的视图**必须不在**重定向表里」写成断言，
+   * 使这类「登记了但被重定向吞掉」的失效**无法再逃过 CI**。
+   *
+   * 反向约束（重定向的键不应出现在 canonical 集里）**刻意不写**：
+   * `dashboard` 这类历史别名同时存在于两处是有意为之（见 canonicalView.ts
+   * 注释与上方 dashboard 用例），一刀切会误报。
+   */
+  it('keeps revived canonical views out of the deprecated redirect map', () => {
+    const canonicalSource = readSource('src/app/navigation/canonicalView.ts');
+    const baseBlock = canonicalSource.match(
+      /BASE_CANONICAL_VIEWS[^=]*=\s*\[([\s\S]*?)\];/,
+    )?.[1] ?? '';
+
+    // 防空断言：解析失效时直接红，而不是让下面的断言空转通过
+    expect(baseBlock, 'BASE_CANONICAL_VIEWS 未解析出内容').not.toBe('');
+
+    /**
+     * ⚠️ 必须**先剥注释**再抽字面量（本用例首版栽在这里）。
+     * 该数组块里的注释会点名历史废弃视图名（如「不能叫 review，它在重定向表里」），
+     * 不剥注释就会把这些**说明性提及**当成真实成员，报出假违规。
+     * 判据只能建立在真实代码上——与 mobileHeaderViewRegistryContract 同款教训。
+     */
+    const baseViews = collectMatches(stripComments(baseBlock), /'([a-z0-9-]+)'/g);
+    expect(baseViews.length).toBeGreaterThan(10);
+
+    const selfRedirected = baseViews.filter((view) => deprecatedViewMap.has(view));
+
+    expect(selfRedirected).toEqual([]);
   });
 });
