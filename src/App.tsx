@@ -78,6 +78,7 @@ import { UserAgreementDialog, useUserAgreement } from './components/legal/UserAg
 import { WelcomeOnboardingDialog, useWelcomeOnboarding } from './components/onboarding/WelcomeOnboardingDialog';
 import { useMigrationStatusListener } from './hooks/useMigrationStatusListener';
 import { useQbankGenerationTasks } from './hooks/useQbankGenerationTasks';
+import { SOLVER_MODE } from './features/chat/plugins/modes';
 import useTheme from './hooks/useTheme';
 import { emitDebug, getDebugEnabled } from './utils/emitDebug';
 import { useDialogControl } from './contexts/DialogControlContext';
@@ -1349,7 +1350,15 @@ function App() {
       );
 
       const session = await createSessionWithDefaults({
-        mode: 'analysis',
+        // 用户反馈 ②：拍题走**独立解题 agent**（`solver`），而非 analysis。
+        //
+        // 两者共用 OCR 前置流水线（`solver` 的 `extends: 'analysis'`），
+        // 差别在**系统提示的四步流程**：复原题意 → **先验思路** → 作答 → **自检**。
+        // 这正对应用户诉求「做题前校验思路、做题后检查答案」。
+        //
+        // ⚠️ 为什么不能只改 analysis 的提示词：用户明确要求「新建独立拍题 agent」，
+        //    且 analysis 仍被别处（错误的解析回看等）复用，改它会波及非拍题场景。
+        mode: SOLVER_MODE,
         title: t('page.analysis_session_title'),
         metadata: { initConfig: { images } },
         initConfig: { images },
