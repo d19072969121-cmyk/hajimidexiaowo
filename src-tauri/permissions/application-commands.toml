@@ -626,6 +626,14 @@ commands.allow = [
   "quick_assistant_apply_enabled",
   "quick_assistant_hide",
   "quick_assistant_show",
+  # E8：题庄外部题库（用户反馈 ③）。命令注册在 src/lib.rs 的 generate_handler! 内。
+  # ⚠️ build.rs 会校验本文件与 lib.rs 的命令列表**完全一致**（missing/stale 都必须为空），
+  #    漏加任一条会让构建在 build script 阶段 panic（实测 CI run #12 即因此失败）。
+  "question_bank_get_quota",
+  "question_bank_list_meta",
+  "question_bank_trial_status",
+  "question_bank_ensure_trial",
+  "question_bank_search_questions",
   "qbank_ai_grade",
   "qbank_ai_generate_questions",
   "qbank_batch_create_questions",
