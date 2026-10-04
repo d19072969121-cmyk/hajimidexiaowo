@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getErrorDetails } from '@/utils/errorUtils';
+// ★ 直接 import **真货**（方案 A）：数据层已抽到 bankClient.ts 并 export，
+//   本契约不再复制一份实现 —— 复刻件漂移风险从根上消除（审查员任务 4 的发现）。
+import { extractErrorCode } from '@/features/practice/questionBank/bankClient';
 
 /**
  * 「额度耗尽」错误码契约 —— 消除前端与 Rust 文案的隐式耦合
@@ -24,40 +27,6 @@ const ROOT = process.cwd();
 const readSource = (relPath: string): string =>
   readFileSync(resolve(ROOT, relPath), 'utf-8');
 
-/** 复刻 MistakeDetailPage 的 extractErrorCode（保持与实现同步） */
-function extractErrorCode(err: unknown): string | null {
-  try {
-    const details = getErrorDetails(err);
-    if (details.code) return details.code;
-  } catch { /* 公共工具对自引用对象会爆栈，忽略 */ }
-
-  const candidates: unknown[] = [err];
-  if (err instanceof Error) candidates.push(err.message);
-  else if (typeof err === 'string') candidates.push(err);
-
-  const MAX_NODES = 16;
-  let visited = 0;
-  while (candidates.length > 0 && visited < MAX_NODES) {
-    visited += 1;
-    const candidate = candidates.shift();
-    if (!candidate || typeof candidate !== 'object') {
-      if (typeof candidate !== 'string') continue;
-      const text = candidate.trim();
-      if (!text.startsWith('{') || !text.endsWith('}')) continue;
-      try { candidates.push(JSON.parse(text)); } catch { /* ignore */ }
-      continue;
-    }
-    const record = candidate as Record<string, unknown>;
-    const nested = record.details;
-    if (nested && typeof nested === 'object') {
-      const code = (nested as Record<string, unknown>).code;
-      if (typeof code === 'string' && code) return code;
-    }
-    const inner = record.error;
-    if (inner !== undefined && inner !== null) candidates.push(inner);
-  }
-  return null;
-}
 
 describe('额度耗尽错误码契约（Rust ↔ Tauri ↔ 前端）', () => {
   it('Rust 侧 429 必须带结构化错误码 quota_exhausted', () => {
@@ -73,12 +42,26 @@ describe('额度耗尽错误码契约（Rust ↔ Tauri ↔ 前端）', () => {
   });
 
   it('前端侧优先读结构化码，不只看文案', () => {
-    const src = readSource('src/features/review/pages/MistakeDetailPage.tsx');
-    expect(src, '前端缺少结构化码解析函数').toMatch(/function\s+extractErrorCode/);
+    // ★ 方案 A 后：实现住在 bankClient.ts（数据层），页面只做 UI
+    const src = readSource('src/features/practice/questionBank/bankClient.ts');
+    expect(src, '数据层缺少结构化码解析函数').toMatch(/export function extractErrorCode/);
     expect(
       src,
       'isQuotaError 未优先使用 extractErrorCode —— 仍以文案为唯一依据',
     ).toMatch(/isQuotaError[\s\S]{0,400}?extractErrorCode/);
+  });
+
+  it('数据层已被页面复用（消除复刻件的结构性前提）', () => {
+    // 若页面又把实现内联回去，本断言会红 —— 防止「抽了但没用」的假重构
+    const page = readSource('src/features/review/pages/MistakeDetailPage.tsx');
+    expect(
+      page,
+      '页面未从 bankClient 导入数据层 —— 要么抽了没用，要么又内联了一份',
+    ).toMatch(/from '@\/features\/practice\/questionBank\/bankClient'/);
+    expect(
+      page,
+      '页面仍内联着 extractErrorCode 实现 —— 会出现两份真货并存',
+    ).not.toMatch(/function\s+extractErrorCode/);
   });
 
   it('能解析 Tauri 的真实传输形态（AppError 塞在 Error.message 里）', () => {

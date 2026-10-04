@@ -542,15 +542,17 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
   /**
    * 当前会话是否为 analysis（拍题解析）模式 —— 是则**首页不渲染它的内容**。
    *
-   * ## 为什么需要（用户反馈 ①）
-   * 拍题链路（`App.tsx` 的 `captureToAnalysisSession`）会把新建的 analysis 会话
-   * `sessionManager.setCurrentSessionId(session.id)` 设为**当前会话**，然后切到
-   * `analysis-result` 视图。用户从解析页返回首页（chat-v2）时，
-   * `currentSessionId` **仍是那个 analysis 会话** →
-   * `ChatContainer` 取 `mode === 'analysis'` → `modePlugin.renderHeader` 命中
-   * `OcrResultHeader`（`plugins/modes/analysis.ts:367`）→
-   * **首页内容区顶部出现「视觉 OCR 识别结果」卡片**（题目/答案折叠面板）。
-   * 这正是用户报的「首页出现本应在拍照子页面出现的视觉 OCR 识别结果」。
+   * 三态：`'unknown'`（store 尚未就绪/已被 LRU 淘汰）| `'analysis'` | `'other'`。
+   *
+   * ## 为什么必须是三态而不是 boolean（审查员实测证伪）
+   * 首版用 `boolean`，在 `!store` 时设 `false` → `canRender = currentSessionId && !false`
+   * = **true → 放行渲染**。而 `sessionManager.get()` 的签名明确可返回 `undefined`
+   * （`sessionManager.ts:189`），且会话管理器有 LRU 上限（`maxSessions = 10`）——
+   * 当 currentSessionId 指向一个**已被淘汰或尚未注册**的 analysis 会话时，
+   * 守卫会反转成「放行」，OCR 卡片重现，而契约完全看不见。
+   *
+   * 三态下 `'unknown'` **保守地不渲染**：宁可空一帧，也不把不该显示的会话内容
+   * 渲到首页（本 bug class 的代价是「用户看到错的东西」，比「短暂空态」严重）。
    *
    * ## 与既有设计一致
    * 首页侧栏本就排除 analysis 会话（`useSessionManagement.ts` 的
@@ -560,26 +562,31 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
    * analysis 会话的正当展示位是 `analysis-result` 视图（它用
    * `useActiveChatStore()` 独立取 store，不受本守卫影响）。
    */
-  const [currentSessionIsAnalysis, setCurrentSessionIsAnalysis] = useState(false);
+  const [sessionKind, setSessionKind] = useState<'unknown' | 'analysis' | 'other'>('unknown');
 
   useEffect(() => {
     if (!currentSessionId) {
-      setCurrentSessionIsAnalysis(false);
+      setSessionKind('unknown');
       return;
     }
     const store = sessionManager.get(currentSessionId);
     if (!store) {
-      setCurrentSessionIsAnalysis(false);
+      // 取不到 store（未注册 / 已被 LRU 淘汰）→ 保守判 unknown（不渲染）
+      setSessionKind('unknown');
       return;
     }
-    const read = (): boolean => store.getState().mode === 'analysis';
-    setCurrentSessionIsAnalysis(read());
+    const read = (): 'analysis' | 'other' =>
+      store.getState().mode === 'analysis' ? 'analysis' : 'other';
+    setSessionKind(read());
     // 响应式：会话切换 / 模式变更都要更新（如从 analysis 会话切到普通会话）
     const unsubscribe = store.subscribe((state, prevState) => {
-      if (state.mode !== prevState.mode) setCurrentSessionIsAnalysis(read());
+      if (state.mode !== prevState.mode) setSessionKind(read());
     });
     return unsubscribe;
   }, [currentSessionId]);
+
+  /** 是否可渲染当前会话内容：必须是已知的「非 analysis」会话 */
+  const canRenderSession = Boolean(currentSessionId) && sessionKind === 'other';
   
   useEffect(() => {
     if (!currentSessionId) {
@@ -1329,7 +1336,7 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
             setMobileResourcePanelOpen(true);
           } : undefined}
         />
-      ) : currentSessionId && !currentSessionIsAnalysis ? (
+      ) : canRenderSession ? (
         <ChatContainer
           sessionId={currentSessionId}
           className="flex-1 h-full"

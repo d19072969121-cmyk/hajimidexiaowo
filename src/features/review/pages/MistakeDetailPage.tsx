@@ -51,108 +51,49 @@ import type { ChatStore } from '@/features/chat/core/types';
 type ChatStoreApi = StoreApi<ChatStore>;
 
 // ============================================================================
-// 题库搜索：**唯一的 invoke 集中点**
+// 题库访问层
 // ============================================================================
+//
+// 数据层（类型 / 归一化 / invoke / 错误分类）已抽到
+// `src/features/practice/questionBank/bankClient.ts`：
+//   1. 消除「复刻件漂移」——契约可直接 import 真货，不再测复制品（审查员指出）
+//   2. 让刷题链路复用同一套能力（用户反馈 ③ 的语义错配：题库能力此前锁死在
+//      本页，刷题页拿不到，导致「温故新知 / 自己定类型」至今没接题库）
+//
+// 本页只保留**与 UI 状态机绑定**的部分（见下方 BankSearchOutcome）。
 
-/** 免费注册提升额度的落地页（挖不到后端 register_url 时的回落，Lead 实测） */
-const DEFAULT_REGISTER_URL = 'https://tizhuang.qcscience.cc/account?mode=register';
-
-/**
- * 「找同类题」的默认条数。
- *
- * ⚠️ **不要调大**。搜题**按返回的父题数精确计费**（实测 `limit=3` → `used` +3），
- * 匿名试用只有 100 题 / 24 小时。默认给 100 会在一次点击里吃掉用户大半额度。
- * Rust 侧 `DEFAULT_QUESTION_LIMIT` 也是 5，两处一致。
- */
-const SEARCH_LIMIT = 5;
-
-/**
- * 题库题目（对齐 Rust 侧 `QuestionBankQuestion`，见
- * `src-tauri/src/cmd/question_bank.rs:374-401`）。
- *
- * ## ⚠️ 字段类型是「意图归一」的结果，不是推测
- * Rust 为防上游类型漂移，把一批字段**透传为 `serde_json::Value`**，因此前端
- * 拿到的实际类型取决于上游返回。据此本页把类型与渲染都按**运行时真实可能**处理：
- *   - `options` / `answer` / `subquestions` / `knowledges`：`Value` —— 可能是
- *     `string[]`、单个 `string`、或对象。**必须先归一再渲染**（见 normalizeStringList）。
- *   - `difficulty` / `year` / `subject_id` / `grade_id`：`Value` —— 可能是数字也
- *     可能是字符串。**比较与展示前必须归一**（见 normalizeNumeric）。
- *   - `title` / `analysis` / `question_type` / `source` / `area`：`Option<String>`，可信。
- *
- * 渲染约定：文本字段是**原始 LaTeX**（`$...$`）→ 喂 Markdown+KaTeX；
- * `*_html` 是**不受信任**的 HTML → 绝不 dangerouslySetInnerHTML。
- */
-export interface BankQuestion {
-  id?: number | null;
-  title?: string | null;
-  title_html?: string | null;
-  /** Value：string[] / string / object 皆可能 */
-  options?: unknown;
-  answer?: unknown;
-  analysis?: string | null;
-  question_type?: string | null;
-  /** Value：number 或 string */
-  difficulty?: unknown;
-  year?: unknown;
-  source?: string | null;
-  area?: string | null;
-  /** 绝对 URL 数组 */
-  image_urls?: readonly string[] | null;
-  /** 复合题子题。**必须与父题一起展示**。Value：数组或对象 */
-  subquestions?: unknown;
-}
-
-/** 搜题命令的返回（对齐 `QuestionBankSearchResult`） */
-export interface BankSearchResult {
-  items: BankQuestion[];
-  /**
-   * 本次**实际消费的额度**（= 返回的父题数）。
-   * Rust 明确要求前端用它而不是 `items.length` 来报额度消耗 —— 计费口径唯一。
-   */
-  billedCount: number;
-  /** 本次是否走匿名试用路由（据此提示「注册可提额」） */
-  usedTrial?: boolean;
-}
-
-/** 剩余额度（对齐 `question_bank_get_quota` 的返回） */
-export interface BankQuota {
-  usedTrial: boolean;
-  questionLimit: number | null;
-  used: number | null;
-  remaining: number | null;
-  registerUrl: string | null;
-  registeredDailyLimit: number | null;
-}
+import {
+  DEFAULT_REGISTER_URL,
+  SEARCH_LIMIT,
+  extractErrorCode,
+  extractRegisterUrl,
+  fetchQuestionBankQuota,
+  isQuotaError,
+  normalizeNumeric,
+  normalizeStringList,
+  normalizeSubQuestions,
+  searchQuestionBank,
+  type BankQuestion,
+  type BankQuota,
+  type BankSearchParams,
+  type BankSearchResult,
+} from '@/features/practice/questionBank/bankClient';
 
 /**
- * 把 `Value` 归一成字符串数组以渲染。
+ * 本页「找同类题」的状态机。
  *
- * 上游 `options`/`answer`/`subquestions` 都是 `Value`，形态可能是：
- *   - `["A. xx", "B. yy"]`        → 数组
- *   - `"A. xx"`                    → 单值，包成单元素数组
- *   - `{ ... }`（对象/嵌套题）     → JSON 不直接展示，丢弃（避免把原始 JSON 甩给用户）
- * 无法识别的一律返回空数组，让调用方跳过该区块 —— **不猜测、不抛错**。
+ * 比 `bankClient.ts` 的 `BankSearchOutcome` 多两个**纯 UI** 态
+ * （`idle` 未点过 / `loading` 请求中）—— 它们不属于数据层语义，故留在页面。
+ * 其余四态语义完全一致（成功 / 空 / 未配置 / 额度用尽 / 错误）。
  */
-function normalizeStringList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((v): v is string => typeof v === 'string' && v.trim() !== '');
-  }
-  if (typeof value === 'string' && value.trim() !== '') return [value];
-  return [];
-}
-
-/**
- * 把 `Value` 归一成数字（供比较/展示）。
- * Rust 明确提醒：这些字段可能是数字也可能是字符串，故不能假定 number。
- */
-function normalizeNumeric(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const n = Number(value.trim());
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
+export type BankSearchOutcome =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'ok'; items: BankQuestion[]; billedCount: number }
+  | { kind: 'empty' }         // 200 但 items 为空 → 换关键词
+  | { kind: 'unconfigured' }  // 没配置题库 → 去配置
+  | { kind: 'quota'; registerUrl: string }  // 额度用尽 → 注册提额度
+  | { kind: 'error'; message: string };
 
 /**
  * 渲染单道题的题干 + 选项 + 答案 + 子题 + 图片 + 元信息。
@@ -163,6 +104,9 @@ function normalizeNumeric(value: unknown): number | null {
  *
  * 未建模的字段一律**跳过而非猜测**：宁可少显示一块，也不能把原始 JSON
  * 或 `undefined` 甩到界面上。
+ *
+ * 注：本函数留在页面内（而非 `bankClient.ts`）—— 它返回 ReactNode，
+ * 属**渲染层**；数据层不需要依赖 React。故 `bankClient.ts` 保持纯数据。
  */
 function renderQuestionList(items: BankQuestion[]): React.ReactNode {
   return (
@@ -272,219 +216,6 @@ function renderQuestionList(items: BankQuestion[]): React.ReactNode {
     </ul>
   );
 }
-
-/** 从子题 `Value` 里取出子题数组（同样不假定结构） */
-function normalizeSubQuestions(value: unknown): Array<{
-  title?: string | null;
-  options?: unknown;
-}> {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is { title?: string | null; options?: unknown } =>
-    Boolean(v) && typeof v === 'object');
-}
-
-/**
- * 搜题结果按「题库语义」分类——各类状态的用户动作完全不同，不可合并。
- */
-export type BankSearchOutcome =
-  | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'ok'; items: BankQuestion[]; billedCount: number }
-  | { kind: 'empty' }         // 200 但 items 为空 → 换关键词
-  | { kind: 'unconfigured' }  // 没配置题库 → 去配置
-  | { kind: 'quota'; registerUrl: string }  // 额度用尽 → 注册提额度
-  | { kind: 'error'; message: string };
-
-/** 题库搜索参数（与 Rust `question_bank_search_questions` 对齐） */
-export interface BankSearchParams {
-  subjectId?: number;
-  gradeId?: number;
-  questionType?: string;
-  difficultyMin?: number;
-  difficultyMax?: number;
-  year?: number;
-  paperType?: string;
-  keyword?: string;
-  editionId?: number;
-  chapterId?: number;
-  offset?: number;
-  /** 默认 5、上限 100（Rust `normalize_limit` 裁决）。**不要传大值**：按题计费 */
-  limit?: number;
-}
-
-/**
- * 【唯一 invoke 调用点 · 搜题】
- *
- * 命令名与参数名已与 Rust 侧核对（`lib.rs:1898` 注册；
- * `question_bank.rs:1084` 签名；Tauri 负责 camelCase → snake_case 映射）。
- *
- * 返回形状由 Rust 统一为 `{ items, billedCount, usedTrial }`，故**不再**兼容
- * 「裸数组」形态；但仍做防御性校验，避免上游漂移时整页崩掉。
- */
-async function searchQuestionBank(params: BankSearchParams): Promise<BankSearchResult> {
-  const { invoke } = await import('@tauri-apps/api/core');
-
-  const raw = await invoke<unknown>('question_bank_search_questions', {
-    subjectId: params.subjectId,
-    gradeId: params.gradeId,
-    questionType: params.questionType,
-    difficultyMin: params.difficultyMin,
-    difficultyMax: params.difficultyMax,
-    year: params.year,
-    paperType: params.paperType,
-    keyword: params.keyword,
-    editionId: params.editionId,
-    chapterId: params.chapterId,
-    offset: params.offset,
-    limit: params.limit ?? SEARCH_LIMIT,
-  });
-
-  if (raw && typeof raw === 'object') {
-    const items = (raw as { items?: unknown }).items;
-    const billed = (raw as { billedCount?: unknown }).billedCount;
-    return {
-      items: Array.isArray(items) ? (items as BankQuestion[]) : [],
-      // billedCount 缺失时回落到 items.length：仍是「本次消费」的合理下界
-      billedCount: typeof billed === 'number'
-        ? billed
-        : (Array.isArray(items) ? items.length : 0),
-      usedTrial: (raw as { usedTrial?: boolean }).usedTrial,
-    };
-  }
-  return { items: [], billedCount: 0 };
-}
-
-/**
- * 【唯一 invoke 调用点 · 查额度】
- *
- * `question_bank_get_quota`（`lib.rs:1894` 注册）。用于在「找同类题」旁
- * 显示剩余额度——试用用户只有 100 题，不告知会让他们误以为搜索「没限额」。
- * 查额度**不消费额度**，可安全调用。
- */
-async function fetchQuestionBankQuota(): Promise<BankQuota | null> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  const raw = await invoke<unknown>('question_bank_get_quota');
-  if (!raw || typeof raw !== 'object') return null;
-  const o = raw as Record<string, unknown>;
-  return {
-    usedTrial: Boolean(o.usedTrial),
-    questionLimit: normalizeNumeric(o.questionLimit),
-    used: normalizeNumeric(o.used),
-    remaining: normalizeNumeric(o.remaining),
-    registerUrl: typeof o.registerUrl === 'string' ? o.registerUrl : null,
-    registeredDailyLimit: normalizeNumeric(o.registeredDailyLimit),
-  };
-}
-
-/**
- * 从错误里尽力挖出注册链接。
- *
- * 后端（quota / 429 响应）会带 register_url；invoke 抛出的可能是结构化对象
- * 也可能是字符串化文本，故两种形态都尝试。
- */
-function extractRegisterUrl(err: unknown): string {
-  if (err && typeof err === 'object') {
-    const direct = (err as { register_url?: unknown; registerUrl?: unknown }).registerUrl
-      ?? (err as { register_url?: unknown }).register_url;
-    if (typeof direct === 'string' && direct.startsWith('http')) return direct;
-  }
-  const text = typeof err === 'string' ? err : getErrorMessage(err);
-  const match = text.match(/https?:\/\/[^\s"'<>)]+/);
-  if (match && /account\?mode=register|register/i.test(match[0])) return match[0];
-  return DEFAULT_REGISTER_URL;
-}
-
-/**
- * 判定「额度用尽」。
- *
- * ## ⚠️ 优先用**结构化错误码**，文本匹配只作最后兜底（返工记录）
- * 初版**只**匹配文案（`'429'`/`'quota'`/`'额度'`），但 Rust 的 429 消息是
- * 「题庄题库额度已耗尽：匿名试用 24 小时 100 题…」——不含 `429`/`quota`，
- * 只是恰好含「额度」二字才没失效。**这是隐式耦合**：Rust 文案一改
- * （如换成「次数已用完」），前端立刻静默失效、把额度耗尽误报成普通网络错误。
- *
- * 现已改为：Rust 在 `AppError.details` 里带 `{"code":"quota_exhausted"}`
- * （见 `src-tauri/src/cmd/question_bank.rs` 的 `map_http_error`），
- * 前端**优先读该字段**；文本匹配降级为兼容旧版本/异常形态的兜底。
- */
-function isQuotaError(err: unknown): boolean {
-  // 1) 结构化错误码（权威依据）
-  const code = extractErrorCode(err);
-  if (code === 'quota_exhausted') return true;
-
-  // 2) 兜底：文本匹配（仅在拿不到结构化码时启用）
-  const text = typeof err === 'string' ? err : getErrorMessage(err);
-  const lower = text.toLowerCase();
-  return lower.includes('429') || lower.includes('rate limit') || lower.includes('quota')
-    || text.includes('额度') || text.includes('次数');
-}
-
-/**
- * 从 Tauri 透传的错误里取结构化错误码。
- *
- * ## 为什么不能只看 `err.details`
- * Tauri 把 Rust 的 `AppError`（`{error_type, message, details}`）序列化后
- * **塞进 `Error.message` 字符串**（见 `src/utils/errorUtils.ts:52-54` 的注释：
- * 「Tauri invoke 失败通常把 JSON 放在 Error.message 中」）。
- * 所以 `err.details` 在边界上**通常取不到**，必须先把 message 里的 JSON 解析出来。
- *
- * ## 做法：复用仓库既有的 `getErrorDetails`
- * 它已经处理了全部真实形态（message 内 JSON 串 / 嵌套 error / 扁平 code / 蛇形
- * `message_key`），不要再自己写一套。这里只在它之上补一层：本项目的 `AppError`
- * 把业务码放在 **`details.code`**（嵌套对象），`getErrorDetails` 不解析该层，
- * 故额外尝试读原始对象与解析后对象上的 `details.code`。
- *
- * 拿不到时返回 null，由调用方走文案兜底。**不抛错**。
- */
-function extractErrorCode(err: unknown): string | null {
-  // 1) 仓库既有解析（处理 Error.message 内的 JSON 串等）。
-  //    ⚠️ 必须包 try/catch：`getErrorDetails` 对**自引用对象**会递归爆栈
-  //    （实测 `RangeError: Maximum call stack size exceeded`，位置 errorUtils.ts:58）。
-  //    那是公共工具的既有缺陷，本页不该因此崩溃——拿不到码就走下面的兜底。
-  try {
-    const details = getErrorDetails(err);
-    if (details.code) return details.code;
-  } catch {
-    // 交由下方自实现路径处理
-  }
-
-  // 2) 补 `details.code` 层：AppError 的业务码埋在这里
-  const candidates: unknown[] = [err];
-  // message 里若是一段 JSON，也尝试解析（与 getErrorDetails 的入口保持一致）
-  if (err instanceof Error) candidates.push(err.message);
-  else if (typeof err === 'string') candidates.push(err);
-
-  // 广度遍历待查对象；`error` 可嵌套多层，也可能自引用成环，故设上限
-  const MAX_NODES = 16;
-  let visited = 0;
-  while (candidates.length > 0 && visited < MAX_NODES) {
-    visited += 1;
-    const candidate = candidates.shift();
-    if (!candidate || typeof candidate !== 'object') {
-      if (typeof candidate !== 'string') continue;
-      const text = candidate.trim();
-      if (!text.startsWith('{') || !text.endsWith('}')) continue;
-      try {
-        candidates.push(JSON.parse(text));
-      } catch {
-        // 非 JSON，忽略
-      }
-      continue;
-    }
-    const record = candidate as Record<string, unknown>;
-    // 形态 A：`details.code`（AppError 直接序列化）
-    const nested = record.details;
-    if (nested && typeof nested === 'object') {
-      const code = (nested as Record<string, unknown>).code;
-      if (typeof code === 'string' && code) return code;
-    }
-    // 形态 B：`error` 字段里再嵌套一层（可能是对象，也可能是 JSON 串）
-    const inner = record.error;
-    if (inner !== undefined && inner !== null) candidates.push(inner);
-  }
-  return null;
-}
-
 // ============================================================================
 // 组件
 // ============================================================================

@@ -71,33 +71,234 @@ const stripComments = (src: string): string => {
 };
 
 /**
- * 判断某个动作是否落在**恒假条件分支**内（即永不执行）。
+ * 判断某个动作是否**永不可达**。
  *
- * ## 为什么需要（P1-5 教训）
- * 表驱动的 `mustReset` 首版只做**文本存在性**检查，审查员把整段复位塞进
- * `if (false) { selectItem(null); ... }` 后，契约实测 **6/6 全绿**
- * —— 看似接线，实际复位永不执行。
+ * ## 两轮审查打穿过的两个错误（都在这里修）
  *
- * ## 判据（保守，只拦明显恒假）
- * 取该动作之前最近的 `if (...)` 条件文本，若条件为显然的假值
- * （`false` / `0` / `''` / `null` / `undefined` / `!true`）则判为死分支。
- * 刻意不做控制流分析——那需要真正的解析器；此处只堵「明显写死」的形态。
- * 真正的可达性保证应由运行期用例承担（见文件头的已知局限）。
+ * **错误 A（假红）**：首版只看「最近一个 `if (...)` 的条件是否为字面量假值」，
+ * **不看动作落在 if 体还是 else 体**。审查员实测：
+ *     `if (false) {} else { setSessionSheetOpen(false); }`
+ * 复位在 `else` 里，条件恒假 ⇒ **else 恒执行** ⇒ 完全可达，却被判死分支。
+ * → 测试会逼后人把防御式写法改掉（与 `onClick={onBack}` 同类的「测试恶化代码」）。
+ *
+ * **错误 B（假绿）**：只认**字面量**假值，认不出「恒真守卫使后续不可达」。审查员实测：
+ *     `if (d?.view !== 'never') return; setSessionSheetOpen(false);`
+ * `detail.view` 永远是真实 viewId，`!== 'never'` **恒真** ⇒ `return` 恒执行
+ * ⇒ 复位永不执行，契约却判绿。
+ *
+ * ## 现判据（保守，只拦「能静态确认永不可达」的两类）
+ * 1. 动作位于 `if (<字面量假值>) { ... }` 的**体内**（且该 if 无 else，或 else 不含该动作）
+ * 2. 动作之前存在 `return`，且该 return 的守卫是**可静态判定为恒真**的形态：
+ *    `x !== '<不等字面量>'`、`!false`、`!0`（含 `detail?.view` 这类成员访问）
+ *
+ * 刻意不做的：真正的数据流/类型分析（需要解析器）。拦不住的形态在文件头已如实记录。
  */
+/**
+ * 求值级判定：条件是否**恒假**（无需自由变量即可求值为 false）。
+ *
+ * ## 为什么必须求值，而不是枚举字面量（第三轮审查打穿后重写）
+ * 前两版都用**白名单**（`false` / `0` / `''` / `null` / `undefined` / `!true`）。
+ * 审查员实测打穿：
+ *     if (1 === 2) { setScreenPosition('center'); ... }   ← 语法正常、语义恒假
+ *     → 契约 6/6 全绿（复位永不执行）
+ * 漏判的还有 `!!false` / `Boolean(0)` / `void 0` / `2<1` / `(1===2) || false` …
+ * **恒假表达式是无限集合，枚举永远漏**。这与 `homeExcludesAnalysisSession` 的
+ * P0-1 是同一类缺陷（形态判据 vs 语义判据），故此处也改用求值。
+ *
+ * ## 判据
+ * 条件中**不含自由变量**（全是字面量/运算符/内置全局）时，直接求值。
+ * 若求值为 `false` → 恒假；含自由变量（如 `x !== 'y'`）→ 不求值，返回 null
+ * （交由 `hasWrongViewGuard` 那类专门判据处理）。
+ *
+ * ## 安全
+ * 只在不含标识符（除白名单内置）时才求值，避免执行任意代码。
+ */
+const evalConstantCondition = (cond: string): boolean | null => {
+  const c = cond.trim();
+  if (!c) return null;
+  /**
+   * 剥离所有「已知常量/内置」后，若还剩**标识符**，说明含自由变量，不求值。
+   *
+   * ⚠️ 首版用一条链式 `replace` 做剥离，实测漏判 `Boolean(0)` 与
+   * `(1===2) || false`（剥离后残留 `|`/括号被判为「有自由变量」）。
+   * 现改为**先删字面量与内置，再用「是否还剩标识符字符」判定**，
+   * 运算符/括号/空白一律不算自由变量。
+   */
+  const stripped = c
+    // 字符串字面量（占位符必须**非字母**，否则会被下方的标识符检查命中 —— 已踩过）
+    .replace(/'[^']*'|"[^"]*"/g, '0')
+    // 数字
+    .replace(/\d+(?:\.\d+)?/g, '0')
+    // 关键字/内置
+    .replace(/\b(?:true|false|null|undefined|void|Boolean|Number|String|NaN|Infinity)\b/g, '0')
+    // 其余运算符与括号（不算自由变量）
+    .replace(/[()<>!=&|?:+\-*/%.,\s]/g, '');
+  // 剩下的只应含数字占位；出现字母/$/_ = 标识符 = 自由变量
+  if (/[A-Za-z_$]/.test(stripped)) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const v = new Function(`"use strict"; return (${c});`)();
+    return Boolean(v);
+  } catch {
+    return null; // 语法不合法等 → 放弃判定
+  }
+};
+
 const isInDeadBranch = (src: string, action: RegExp): boolean => {
   const m = action.exec(src);
   if (!m) return false;
   const before = src.slice(0, m.index);
-  // 找最近一个未被闭合的 if 条件（简化：取最后一次出现的 if (...)）
-  const condRe = /if\s*\(([^)]*)\)\s*\{/g;
-  let last: RegExpExecArray | null = null;
+
+  // ── 判据 2：动作之前有「恒真守卫的提前 return」──────────────────────────
+  const earlyReturns = [...before.matchAll(/if\s*\(([^)]*)\)\s*(?:\{\s*)?return\b/g)];
+  for (const er of earlyReturns) {
+    if (evalConstantCondition(er[1]) === true) return true;
+  }
+
+  // ── 判据 1：动作落在「恒假条件」的语句体内 ──────────────────────────────
+  //
+  // ⚠️ 条件提取必须支持**嵌套括号**：首版用 `/if\s*\(([^)]*)\)\s*\{/`，
+  //    `[^)]*` 遇到 `Boolean(0)` 的内层 `)` 就停了 → 条件被截成 `Boolean(0`，
+  //    提取失败 → 该形态全部漏判（审查员实测 `if (Boolean(0))` 漏）。
+  //    改用「找关键字 → 括号配对取条件 → 找紧邻的 `{`」。
+  //
+  // ⚠️ 关键字必须含 `while`/`for`：两位审查员独立指出
+  //    `while (false) { <复位> }` / `for (;false;) { <复位> }` 同样永不执行，
+  //    而首版只扫 `if` → 漏判。`evalConstantCondition` 的能力本来就够，
+  //    差的只是提取阶段多认几个关键字。
+  //
+  // ⚠️ `do { <复位> } while (false)` **刻意不纳入**：do-while 的循环体
+  //    **至少执行一次**，恒假条件**不**使其不可达 —— 纳入会造成假红。
+  const stmtRe = /(?:if|while|for)\s*\(/g;
+  let last: { cond: string; bodyStart: number } | null = null;
   let hit: RegExpExecArray | null;
-  while ((hit = condRe.exec(before)) !== null) last = hit;
+  while ((hit = stmtRe.exec(before)) !== null) {
+    const open = stmtRe.lastIndex - 1; // 指向 `(`
+    let depth = 1;
+    let i = open + 1;
+    for (; i < src.length && depth > 0; i += 1) {
+      if (src[i] === '(') depth += 1;
+      else if (src[i] === ')') depth -= 1;
+    }
+    if (depth !== 0) continue;
+    let cond = src.slice(open + 1, i - 1);
+    // `for (init; cond; step)` 取中间段；`if`/`while` 原样使用
+    if (hit[0].startsWith('for')) {
+      const parts = cond.split(';');
+      if (parts.length === 3) cond = parts[1];
+    }
+    cond = cond.trim();
+    // 该语句之后必须紧跟 `{`（否则是单语句体，本判据不处理）
+    let j = i;
+    while (j < src.length && /\s/.test(src[j])) j += 1;
+    if (src[j] !== '{') continue;
+    last = { cond, bodyStart: j + 1 };
+  }
   if (!last) return false;
-  const cond = last[1].trim().replace(/\s+/g, '');
-  const alwaysFalse = ['false', '0', "''", '""', 'null', 'undefined', '!true'];
-  return alwaysFalse.includes(cond);
+
+  if (evalConstantCondition(last.cond) !== false) return false;
+
+  // 取该 if 的 {} 配对范围，判断动作下标是否在其**体内**
+  const bodyStart = last.bodyStart;
+  let depth = 1;
+  let i = bodyStart;
+  for (; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1;
+    else if (src[i] === '}') {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+  }
+  const actionInsideIfBody = m.index > bodyStart && m.index < i;
+  // 在 if 体内 + 条件恒假 + 没有把动作放到 else → 永不可达
+  return actionInsideIfBody;
 };
+
+
+/**
+ * 识别「view 守卫写错了字面量」—— 即 `x?.view !== '<某值>'` 后紧跟 return，
+ * 但其字面量**不是本页真实 viewId** 的形态。
+ *
+ * 本仓库的复位 handler 都以 `if (detail?.view !== '<viewId>') return;` 开头。
+ * 若有人把字面量写错（如 `'never'`、`'chat-v3'`），守卫恒真 → 复位永不可达。
+ * 本函数只做**结构性识别**（是不是 `*.view !== '<字面量>'`），是否「写错」
+ * 由调用方结合合法 viewId 集合判断。
+ */
+const VIEW_GUARD_RE = /^[A-Za-z_$][\w$]*\??\.view!==?'[^']*'$|^[A-Za-z_$][\w$]*\??\.tab!==?'[^']*'$/;
+const viewGuardLooksWrong = (cond: string): boolean => VIEW_GUARD_RE.test(cond);
+
+/**
+ * 复位 handler 是否以「恒真的 view/tab 守卫 + 提前 return」开头 —— 使后续复位永不可达。
+ *
+ * ## 为什么需要
+ * 本仓库所有复位 handler 都以 `if (detail?.view !== '<本页viewId>') return;` 开头。
+ * 若这个守卫被写成**恒真**（字面量写错、双重否定、恒等比较…），
+ * `return` 会无条件执行，**后面所有复位动作永不执行** ——
+ * 也就是用户反馈 ④ 原样复发（点底栏回不到根），而「文本存在性」判据照样绿。
+ *
+ * ## 为什么必须求值（三轮审查打穿的教训）
+ * 首版用**单条正则 + 9 个已知 viewId 的白名单**。审查员实测绕过：
+ *     if (!(detail?.view !== 'learning-hub')) return;   ← 双重否定 = 恒真 → 漏判
+ *     if (detail?.view !== someVar) return;             ← 变量右操作数 → 漏判
+ *     if (detail?.view === detail?.view + 'x') return;  ← 恒真但非 `!==` 形态 → 漏判
+ * 与 P0-1（宽窗口 `includes`）、P1-1（字面量白名单）是**同一个病**：
+ * **形态判据 vs 语义判据**。故此处同样改为求值。
+ *
+ * ## 判据（安全且闭合）
+ * 1. 抽出所有 `if (<cond>) return;` 的 `<cond>`；
+ * 2. 把受控自由变量（`X.view` / `X.tab` / `detail` 等）**代入本页真实 viewId**；
+ *    含义正是我们要问的：「这个守卫**对本页**是否恒真」；
+ * 3. 若剩下的表达式**不含其它自由变量**，求值：为 `true` ⇒ 恒真守卫 ⇒ 违规；
+ * 4. 含其它未知标识符 ⇒ 放弃判定（保守放行，不做数据流分析）。
+ *
+ * ## 已知边界（刻意保守，勿当已覆盖）
+ * 实测覆盖 / 未覆盖（第三轮审查员提供形态清单，我在修复态逐个复测）：
+ * ```
+ * 覆盖  if (detail?.view !== 'never') return;              ← 字面量写错
+ * 覆盖  if (!(detail?.view !== '<本页id>')) return;         ← 双重否定
+ * 覆盖  if (detail?.view !== '<别的已知id>') return;         ← 正确：合法守卫，放行
+ * 未覆盖 if (detail?.view !== someVar) return;             ← 变量右操作数（需数据流分析）
+ * 未覆盖 if (detail?.view === detail?.view + 'x') return;  ← 字符串运算型恒真
+ * ```
+ * 后两条**刻意不覆盖**：要覆盖它们需要真正的数据流/常量传播分析（代入后仍含自由变量
+ * 或需执行字符串拼接），成本远超收益，且这类写法在真实代码里极罕见
+ * （正常写法是 `!== '<字面量>'`）。**若将来真的出现，本契约会放行** ——
+ * 这是已知的、写明的边界，不是遗漏。
+ */
+const hasWrongViewGuard = (handler: string, ownViewId: string): boolean => {
+  const guards = [...handler.matchAll(/if\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?:\{\s*)?return\b/g)];
+  for (const g of guards) {
+    const cond = g[1].trim();
+    if (!cond) continue;
+
+    // 只处理**涉及 view/tab 守卫**的条件（本函数的职责边界）
+    if (!/\??\.(?:view|tab)\b/.test(cond)) continue;
+
+    // 代入：受控变量 → 本页 viewId；同时不引入任何其它自由变量
+    const substituted = cond
+      .replace(/[A-Za-z_$][\w$]*\??\.(?:view|tab)\b/g, JSON.stringify(ownViewId));
+
+    // 代入后仍含标识符（除已知内置）→ 有其它自由变量 → 放弃判定
+    const residue = substituted
+      .replace(/'[^']*'|"[^"]*"/g, '0')
+      .replace(/\d+(?:\.\d+)?/g, '0')
+      .replace(/\b(?:true|false|null|undefined|void|Boolean|Number|String|NaN|Infinity)\b/g, '0')
+      .replace(/[()<>!=&|?:+\-*/%.,\s]/g, '');
+    if (/[A-Za-z_$]/.test(residue)) continue;
+
+    // 求值：恒真 ⇒ 守卫恒真 ⇒ 后续复位永不可达
+    try {
+      // eslint-disable-next-line no-new-func
+      const v = new Function(`"use strict"; return (${substituted});`)();
+      if (v === true) return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+};
+
+
 
 describe('Tab 底栏回根契约（用户反馈 ④）', () => {
   const appSrc = stripComments(readSource('src/App.tsx'));
@@ -339,13 +540,20 @@ describe('Tab 底栏回根契约（用户反馈 ④）', () => {
         continue;
       }
       for (const re of c.mustReset) {
-        // ★ 可达性检查（P1-5 教训）：必须出现在 while/if 的**体内部**才算数，
-        //   首版只做「文本存在性」，审查员把复位塞进 `if (false) {}` 后仍 6/6 全绿。
+        // ★ 可达性检查（两轮审查教训）：
+        //  - 首版只做「文本存在性」→ 塞进 `if (false) {}` 后仍全绿
+        //  - 二版认字面量假值，但①不看动作在 if 体还是 else 体（假红）
+        //                       ②认不出「恒真守卫 + 提前 return」（假绿）
         if (!re.test(handler)) {
           violations.push(`${c.viewId} 的复位处理器缺少动作 ${re}（该状态决定用户能否回根）`);
         } else if (isInDeadBranch(handler, re)) {
           violations.push(
-            `${c.viewId} 的复位动作 ${re} 落在「恒假条件」分支内 —— 看似接线，实际永不执行`,
+            `${c.viewId} 的复位动作 ${re} 落在永不可达的分支内 —— 看似接线，实际永不执行`,
+          );
+        } else if (hasWrongViewGuard(handler, c.viewId)) {
+          violations.push(
+            `${c.viewId} 的复位处理器开头有「恒真的 view/tab 守卫 + 提前 return」`
+            + `（守卫字面量既不等于本页 viewId 也不是已知变量）—— 复位永不可达`,
           );
         }
       }

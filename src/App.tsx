@@ -1190,6 +1190,48 @@ function App() {
     //（对应 lazy 页面模块已在 vite.demo.config.ts 中 stub 剔除，不会被打包/加载）
     if (isDemoShell && targetView !== 'chat-v2') return;
 
+    // ── 用户反馈 ①：离开 analysis-result 时收口清掉 analysis 当前会话 ──────────
+    //
+    // ## 为什么必须在这里收口（而不是挂在某个按钮的 onBack 上）
+    // 首版只改了 `analysis-result` 的 `onBack`，**覆盖不全**（审查员实测证伪）：
+    //   1) **底栏 Tab**：`handleSelectTab` 函数体内 `setCurrentSessionId` 出现 0 次 ——
+    //      用户从解析页点底栏回首页（最自然的操作）根本不会触发 onBack。
+    //   2) **Android 返回键**：App 壳层 handler 走 `unifiedGoBack.goBack()` 或
+    //      fallback `setCurrentView('chat-v2')`，同样不清会话。
+    //   3) `src/components/analysis/` 下 `registerBackHandler` 零命中，
+    //      解析页自己没有返回键 handler。
+    // 这三条都汇聚到同一个函数：`setCurrentView`。故在此收口，一次覆盖全部出口。
+    //
+    // ## 为什么必须清
+    // 拍题链路把 analysis 会话设成了「当前会话」。离开解析页后若不清，
+    // `currentSessionId` 仍指向它 → 首页 `ChatContainer` 取 `mode='analysis'`
+    // → `renderHeader` 渲染 `OcrResultHeader` → **首页顶部冒出「OCR 识别结果」卡片**。
+    // 首页侧栏本就排除 analysis 会话（`SIDEBAR_EXCLUDE_MODES`），
+    // 内容区却留着它，就是「侧栏看不到、内容区却在渲染」的不一致。
+    //
+    // ## 边界（刻意收窄，避免误伤）
+    // - 只在**离开** analysis-result（prev 是它、target 不是它）时清
+    // - 只在当前会话**确实是 analysis 模式**时清 —— 避免清掉用户自己选中的普通会话
+    // - 进入 analysis-result 时**不清**（那是拍题链路的正当使用）
+    //
+    // ## 已知边界（刻意不处理，勿当 bug）
+    // 若 `sessionManager.get(id)` 返回 `undefined`（会话尚未加载进 sessions map），
+    // 下方 `store &&` 会让本收口**跳过清理**，留下「存在但不可见」的当前会话。
+    // 为何不加复杂度去兜：拍题链路刚经 `createSessionWithDefaults` 建过会话，
+    // store 大概率已在 map 里；且 `ChatV2Page` 的内容区守卫（三态 sessionKind）
+    // 已能兜住症状 —— OCR 卡片不会重现。权衡后选择保持简单。
+    if (prevView === 'analysis-result' && targetView !== 'analysis-result') {
+      try {
+        const sessionId = sessionManager.getCurrentSessionId();
+        const store = sessionId ? sessionManager.get(sessionId) : undefined;
+        if (store && store.getState().mode === 'analysis') {
+          sessionManager.setCurrentSessionId(null);
+        }
+      } catch {
+        // 清理失败不应阻断导航本身
+      }
+    }
+
     if (targetView !== prevView) {
       const startTime = performance.now();
       viewSwitchStartRef.current = { from: prevView, to: targetView, startTime };
