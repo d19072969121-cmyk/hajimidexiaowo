@@ -77,7 +77,8 @@
     "check:licenses": "npm run licenses:check",
     "test:lifecycle-gate": "node scripts/lifecycle-score-gate.mjs",
     "registry:sync": "node scripts/sync-model-registry.mjs",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "verify:acl": "python3 build/ci/verify-app-acl.py"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
