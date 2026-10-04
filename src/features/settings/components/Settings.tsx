@@ -605,6 +605,45 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, isActive = true }) =
     handleMobileSettingsBack();
   }, [screenPosition, mobileNavView, handleBack, handleMobileSettingsBack]);
 
+  /**
+   * 用户点了底部 Tab 栏的 me 格 → 复位到设置首页（用户反馈 ④）。
+   *
+   * ## 为什么需要
+   * 设置的「二级面」是**页面内部 state**（`screenPosition` 三屏 + `mobileNavView`
+   * 的 sections/content），不在 CurrentView 层级上。用户在某个分区内容态时点 me 底栏：
+   * `TAB_ROOT_VIEW.me === 'settings' === currentView`
+   * → `setCurrentView` 同值写入、React 不重渲染、`VIEW_SWITCHED` 也不派发
+   * → 停在那个分区，回不到设置首页。
+   *
+   * ## 复位目标（幂等）
+   * - `screenPosition` → 'center'
+   * - `mobileNavView` → 'sections'（分区列表是设置的根）
+   * - `activeTab` → 默认分区（内容态也一并清掉，见下）
+   * - 关闭可能打开的供应商浮层
+   *
+   * ## ⚠️ 为什么**不能**用 `isActive`（prop 派生）做前置门禁（P0 教训）
+   * `handleSelectTab` 里 `handleViewChange(rootView)` 是 setState，
+   * 而 `dispatchAppEvent` 在**同一次 React 事件里同步执行** —— 此时本组件的
+   * `isActive` prop 仍是**上一轮的旧值**。用户从别的 Tab 首次点 me 时，
+   * 旧值是 false → 复位被跳过 → 用户回到 settings 但停在二级面，
+   * **必须再点一次才回根**（实测复现，正是用户反馈 ④ 的形态）。
+   *
+   * 因此改为在**事件到达时**重算「我是不是当前视图」：用 `isActive` 的实时 ref。
+   * 复位逻辑本身幂等（已在根态时两次 set 同值 no-op），故不需要注册期门禁。
+   */
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  useAppEvent(APP_EVENTS.TAB_ROOT_RESET, (detail) => {
+    if (detail?.view !== 'settings') return;
+    // 用 ref 读**实时**值，而非闭包里的陈旧 prop（见上）
+    if (!isActiveRef.current) return;
+    setScreenPosition('center');
+    setMobileNavView('sections');
+    // 分区内容态复位到默认分区：桌面端没有 mobileNavView 掩盖，残留会把用户留在原分区
+    setActiveTab('apis');
+    setMobileVendorDetailOpen(false);
+  }, [setActiveTab]);
+
   // Android 返回键：设置两级导航逐级回退（供应商详情 → 供应商列表 → 分区内容 → 分区列表）。
   //
   // 必须注册在 overlay 档而非 view 档：移动端 Settings 整页是 Radix Sheet

@@ -2018,9 +2018,20 @@ function App() {
 
   // 点击 Tab → 导航到该 Tab 的默认落地视图。
   // 返回 false 表示被移动端导航守卫拦截（如键盘/模态流程中）。
+  //
+  // ⚠️ 必须**无条件**广播 TAB_ROOT_RESET（用户反馈 ④）。
+  // 原因：部分页面的「二级面」是页面内部 state（如 learning-hub 的
+  // screenPosition），不在 CurrentView 层级上。此时 TAB_ROOT_VIEW[tab]
+  // 与 currentView 相同 → setCurrentView 同值写入、React 不重渲染、
+  // VIEW_SWITCHED 也不派发 → 页面停在二级面不动。
+  // 用户感受：「点底栏图标后，进的是那个页面的二级面，没回到根 UI」。
+  // 故本回调即使视图不变也要发出复位请求；有内部层级的页面监听它并复位。
   const handleSelectTab = useCallback((tab: TabId): boolean => {
     if (shouldBlockMobileNavigation()) return false;
-    handleViewChange(TAB_ROOT_VIEW[tab]);
+    const rootView = TAB_ROOT_VIEW[tab];
+    handleViewChange(rootView);
+    // 始终广播：视图真变时它是幂等的补充；视图未变时它是唯一的复位信号
+    dispatchAppEvent(APP_EVENTS.TAB_ROOT_RESET, { tab, view: rootView });
     return true;
   }, [shouldBlockMobileNavigation, handleViewChange]);
 

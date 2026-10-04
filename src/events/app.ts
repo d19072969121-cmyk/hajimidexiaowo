@@ -19,6 +19,22 @@ export const APP_EVENTS = {
   SYSTEM_SETTINGS_CHANGED: 'systemSettingsChanged',
   WORKBENCH_MODE_CHANGED: 'workbench:mode-changed',
   VIEW_SWITCHED: 'app:view-switched',
+  /**
+   * 用户点了底部 Tab 栏的某一格 → 请求该 Tab 的**根页面**复位到自身根状态。
+   *
+   * 为什么需要独立事件（而非复用 VIEW_SWITCHED）：
+   * 部分页面的「二级面」是**页面内部 state**（不在 CurrentView 层级上），
+   * 典型如 `learning-hub` 的 `screenPosition`（left/center/right）。此时
+   * `TAB_ROOT_VIEW[tab] === currentView`，`setCurrentView` 是同值写入、
+   * React 不重渲染、`VIEW_SWITCHED` 也不派发（它只在 view 真变时发），
+   * 于是页面停在二级面不动 —— 用户感受就是「点底栏没回到那个 Tab 的根 UI」。
+   *
+   * 语义：**无论视图是否变化都要广播**。有内部层级的页面监听它并把自身
+   * 复位到根态；无内部层级的页面可忽略。
+   *
+   * 约束：页面复位必须**幂等**（已在根态时重复收到不得报错/回退过度）。
+   */
+  TAB_ROOT_RESET: 'app:tab-root-reset',
   NAVIGATE_TO_TAB: 'navigate-to-tab',
   NAVIGATE_TO_VIEW: 'NAVIGATE_TO_VIEW',
   SETTINGS_NAVIGATE_TAB: 'SETTINGS_NAVIGATE_TAB',
@@ -77,6 +93,19 @@ export interface WorkbenchModeChangedDetail {
 export interface ViewSwitchedDetail {
   from: CurrentView;
   to: CurrentView;
+}
+
+/**
+ * `TAB_ROOT_RESET` 载荷：用户点了哪个 Tab，以及该 Tab 的根视图是哪个。
+ *
+ * 页面据此判断「被要求复位的是不是我」——比对 `view` 与自身视图 id 即可，
+ * 从而不必各自 import tabNavigation（保持事件解耦）。
+ */
+export interface TabRootResetDetail {
+  /** 被点击的 Tab */
+  tab: string;
+  /** 该 Tab 的根视图（TAB_ROOT_VIEW[tab]） */
+  view: CurrentView;
 }
 
 export interface NavigateToTabDetail {
@@ -213,6 +242,7 @@ export interface AppEventPayloads {
   [APP_EVENTS.SYSTEM_SETTINGS_CHANGED]: SystemSettingsChangedDetail;
   [APP_EVENTS.WORKBENCH_MODE_CHANGED]: WorkbenchModeChangedDetail;
   [APP_EVENTS.VIEW_SWITCHED]: ViewSwitchedDetail;
+  [APP_EVENTS.TAB_ROOT_RESET]: TabRootResetDetail;
   [APP_EVENTS.NAVIGATE_TO_TAB]: NavigateToTabDetail;
   [APP_EVENTS.NAVIGATE_TO_VIEW]: NavigateToViewDetail;
   [APP_EVENTS.SETTINGS_NAVIGATE_TAB]: SettingsNavigateTabDetail;

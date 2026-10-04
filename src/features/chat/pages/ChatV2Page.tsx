@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { Plus, Chat, X, FileText, BookOpen, ClipboardText, Image, File, CircleNotch, DotsSixVertical, Warning, ArrowSquareOut, SquaresFour } from '@phosphor-icons/react';
 import { DsButton } from '@/components/ui/DsButton';
+import { APP_EVENTS, useAppEvent } from '@/events';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { CommonTooltip } from '@/components/shared/CommonTooltip';
@@ -720,6 +721,35 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
     closeSandboxWorkbench(sandboxOwnerKey);
     setMobileResourcePanelOpen(false);
   }, [closeSandboxWorkbench, sandboxOwnerKey]);
+
+  /**
+   * 用户点了底部 Tab 栏的 home 格 → 收回**左屏会话列表抽屉**（用户反馈 ④）。
+   *
+   * ## 为什么本页该接（与 todo/flashcards/template-management 的区别）
+   * 本页**就是 home Tab 的根视图**（`TAB_ROOT_VIEW.home === 'chat-v2'`），
+   * 满足底栏复位的适用条件。而左屏（`sessionSheetOpen`）是纯导航抽屉，
+   * 不是内容态 —— 用户点底栏时把它收回中屏，是符合直觉的「回根」。
+   *
+   * ## ⚠️ 刻意**不收右屏**（与既有决策一致，勿扩大范围）
+   * 右屏（`sandboxWorkbenchOpen` / `mobileResourcePanelOpen`）承载用户**正在
+   * 查看的资源或运行中的沙箱**。点底栏就把它关掉，等于把用户正在做的事
+   * 当垃圾清掉 —— 属功能破坏。右屏的收口出口是既有 `closeMobileSandbox` /
+   * `handleCloseSandbox`（顶栏返回箭头 / 手势 / Android 返回键），不归底栏管。
+   *
+   * 同上，`viewMode === 'browser'`（全宽浏览态）也不动：它有专门的返回路径
+   * （mobileCenterBack 里 browser→sidebar 并重开会话抽屉）。
+   *
+   * ## 幂等
+   * 已在中屏时 `setSessionSheetOpen(false)` 是同值写入，no-op。
+   */
+  useAppEvent(APP_EVENTS.TAB_ROOT_RESET, (detail) => {
+    // 本页是 home 根视图；只有点 home 时才轮到本页复位
+    if (detail?.view !== 'chat-v2') return;
+    // 只在「中屏 + 左屏抽屉打开」这一种情况下动手，其余状态一律不碰
+    if (!mobileResourcePanelOpen && !sandboxWorkbenchOpen && sessionSheetOpen) {
+      setSessionSheetOpen(false);
+    }
+  }, [mobileResourcePanelOpen, sandboxWorkbenchOpen, sessionSheetOpen]);
   // 右屏资源预览返回上一层（资源库列表），而非直接退回聊天
   const closeMobileOpenApp = useCallback(() => {
     setOpenApp(null);

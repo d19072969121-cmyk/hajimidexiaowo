@@ -741,6 +741,27 @@ export const TemplateManagementApp: React.FC<TemplateManagementAppProps> = ({
     handleCancelEdit();
   }, [screenPosition, handleCancelEdit]);
 
+  // ⚠️ 刻意**不**监听 TAB_ROOT_RESET（用户反馈 ④ 的返工记录，勿重新加回）
+  //
+  // ## 两个独立的否决理由
+  //
+  // 1) **本页不是 me Tab 的根视图**：`TAB_ROOT_VIEW.me === 'settings'`，而本页是
+  //    `'template-management'`。点 me 底栏会先 `setCurrentView('settings')` 把用户
+  //    切走，复位发生在已 `visibility:hidden` 的层里，**用户看不到** —— 白写 + 误导航。
+  //
+  // 2) **会静默丢弃用户的编辑草稿**（实测）：本页复位的唯一正确路径是走
+  //    `handleCancelEdit` → `confirmDiscardEditorChanges` 的脏检查，而该脏检查用的
+  //    `unifiedConfirm`（src/utils/unifiedDialogs.ts）**不是模态框**，是「全局 toast +
+  //    8 秒内再点一次即放行」的两击语义。底栏复用它的后果是：
+  //    用户点 me → 只弹一个 toast（看起来像「没反应」）→ 本能再点一次
+  //    → **未保存的模板编辑被直接丢弃，无二次确认**。这是底栏复位引入的
+  //    净新增数据丢失路径，绝不能保留。
+  //
+  // 编辑态的离场出口是顶栏返回箭头 / Android 返回键（见下方 useMobileHeader
+  // 的 `onMenuClick: isEditingMode ? handleEditorBack : ...`），不归底栏管。
+  // 底栏复位的适用条件是「该页就是自己 Tab 的根视图」（如 learning-hub / settings），
+  // 本页不满足，故不接。
+
   // 选择模式小屏顶栏直接作为「返回制卡」出口（有 onCancel 才启用）
   const selectingHeaderBack = isSelectingMode && Boolean(onCancel);
 

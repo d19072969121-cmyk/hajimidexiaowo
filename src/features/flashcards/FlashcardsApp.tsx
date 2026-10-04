@@ -71,6 +71,18 @@ export const FlashcardsApp: React.FC<FlashcardsAppProps> = ({
     setScreen(reviewOrigin.current);
   }, [endSession, setScreen]);
 
+  // ⚠️ 刻意**不**监听 TAB_ROOT_RESET（用户反馈 ④ 的返工记录，勿重新加回）
+  //
+  // 本页不是 review Tab 的根视图：`TAB_ROOT_VIEW.review === 'review-hub'`，
+  // 而本页是 `'flashcards'`。用户点 review 底栏会先 `setCurrentView('review-hub')`
+  // 把用户切走，复位即便执行也发生在已 `visibility:hidden` 的层里，**用户看不到**
+  // —— 白写 + 误导航（用户想回闪卡根屏，却被弹到复习入口页）。
+  //
+  // 本页 screen 四屏的正确出口是顶栏返回（onBack）/ 会话内的 `exitReview`
+  // （会先 `endSession()` 再回 `reviewOrigin`），不归底栏管。
+  // 底栏复位的适用条件是「该页就是自己 Tab 的根视图」（如 learning-hub / settings），
+  // 本页不满足，故不接。
+
   const onBack = mobileChrome?.onBack;
   useMobileHeader('flashcards', {
     title: mobileChrome?.title ?? t(screen === 'settings' ? 'statistics.title' : `${screen}.title`),

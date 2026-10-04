@@ -105,6 +105,18 @@ export const TodoContentView: React.FC<TodoContentViewProps> = ({
   const closeDesktopTrash = useTodoTrashView((s) => s.close);
   const reloadGuardRef = useRef<{ cancelled: boolean }>({ cancelled: false });
 
+  // ⚠️ 刻意**不**监听 TAB_ROOT_RESET（用户反馈 ④ 的返工记录，勿重新加回）
+  //
+  // 本体不是 home Tab 的根视图：`TAB_ROOT_VIEW.home === 'chat-v2'`，而本页是
+  // `'todo'`。用户点 home 底栏时 `handleSelectTab` 会先 `setCurrentView('chat-v2')`
+  // 把用户**切走**，复位即便执行也发生在已 `visibility:hidden` 的层里，
+  // **用户看不到** → 等于白写，还多了一次误导航（用户想回待办根，却被弹到会话页）。
+  //
+  // 本页二级面的正确出口是**顶栏返回箭头 / Android 返回键**（见下方 useMobileHeader
+  // 的 `onMenuClick: () => selectItem(null)`）与各子屏自带的返回，不归底栏管。
+  // 底栏复位的适用条件是「该页就是自己 Tab 的根视图」（如 learning-hub / settings），
+  // 本页不满足，故不接。
+
   // 自动化视图的移动端顶栏动作（≤2 契约）：页内标题栏在移动壳下隐藏
   // （TodoAutomationWorkspace hideHeader），刷新 / 新建上移统一顶栏。
   // 新建复用 requestAutomationCreate 共享入口（工作区消费，与命令面板同路径，

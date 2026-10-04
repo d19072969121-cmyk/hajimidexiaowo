@@ -38,6 +38,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { APP_EVENTS, useAppEvent } from '@/events';
 import { MobileResourceMenuContext } from '@/components/layout/MobileResourceMenuContext';
 import { useTranslation } from 'react-i18next';
 import { PanelGroup, Panel, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels';
@@ -679,6 +680,29 @@ export const LearningHubPage: React.FC = () => {
   const finderBreadcrumbs = finderCurrentPath.breadcrumbs;
   const finderViewCapabilities = getViewCapabilities(finderCurrentPath.viewKind);
 
+  /**
+   * 面包屑的可读 ref（供 TAB_ROOT_RESET 事件回调读取**最新**深度）。
+   * 事件回调不随 breadcrumbs 重建（useAppEvent 的 deps 为空），
+   * 直接闭包捕获会读到首次渲染的旧值，故用 ref 同步。
+   */
+  const finderBreadcrumbsRef = useRef(finderBreadcrumbs);
+  finderBreadcrumbsRef.current = finderBreadcrumbs;
+
+  /**
+   * `finderGoUp` 的实时引用（P1 教训：不能把 store action 闭包在 deps:[] 里）。
+   *
+   * `useHostFinderStore` 依赖 `isSmallScreen` 选择宿主桶——`page-mobile` 与
+   * `page` 是**两个独立桶**（finderStore 的 pageMobile / page 各自持有 state）。
+   * 而 `isSmallScreen` 由媒体查询驱动，**挂载期间会变**（横竖屏切换、分屏、折叠屏）。
+   *
+   * 若事件回调用 `deps: []` 闭包捕获 `finderGoUp`，它会冻结在**首帧那个桶**上：
+   * 尺寸变化后 `finderBreadcrumbsRef` 同步的是新桶深度，而 `goUp` 打在旧桶 →
+   * 按新桶深度循环却改旧桶，结果是该回根的没回根 / 旧桶被过度回退。
+   * 用 ref 每次渲染刷新引用即可同时拿到「最新深度 + 最新桶」。
+   */
+  const finderGoUpRef = useRef(finderGoUp);
+  finderGoUpRef.current = finderGoUp;
+
   // ★ 记忆系统改造：导航到记忆文件夹（优先 enterFolder，回退 MemoryView）
   const navigateToMemory = useCallback(async () => {
     try {
@@ -711,6 +735,39 @@ export const LearningHubPage: React.FC = () => {
   // ========== 📱 移动端顶栏导航逻辑 ==========
   // 判断是否在子文件夹中（不在根目录）
   const isInSubfolder = finderBreadcrumbs.length > 0;
+
+  /**
+   * 用户点了底部 Tab 栏的 media 格 → 复位到本页根状态（用户反馈 ④）。
+   *
+   * ## 为什么需要（而不是靠 setCurrentView）
+   * 本页的「二级面」是**页面内部 state**（`screenPosition` 三屏 + finder 目录层级），
+   * 不在 CurrentView 层级上。用户在 center 深入子目录、或滑到 left/right 屏后，
+   * 点底栏 media：`TAB_ROOT_VIEW.media === 'learning-hub' === currentView`
+   * → `setCurrentView` 同值写入、React 不重渲染、`VIEW_SWITCHED` 不派发
+   * → 页面停在二级面。用户感受：「点底栏没回到根 UI」。
+   *
+   * ## 复位目标（幂等）
+   * - `screenPosition` → 'center'（中屏是根；left 是应用入口、right 是应用内容）
+   * - finder 目录层级 → 一路 `goUp` 直到根（`isInSubfolder` 为 false）
+   *
+   * 幂等性：已在根态时两次 set 都是同值，`goUp` 在根态不会被调用（有守卫），
+   * 重复点击底栏不会产生异常或过度回退。
+   */
+  useAppEvent(APP_EVENTS.TAB_ROOT_RESET, (detail) => {
+    // 只响应「复位的就是本页」的请求；其它 Tab 的复位与本页无关
+    if (detail?.view !== 'learning-hub') return;
+
+    setScreenPosition('center');
+    setMobileHeaderMenuOpen(false);
+    // finder 层级可能有多层，逐层回根（goUp 单次只上一层）。
+    // 必须走 ref 取**实时** action（见 finderGoUpRef 的说明：deps:[] 会冻结旧桶）。
+    // 用循环上限兜底，避免异常状态下死循环。
+    let guard = 0;
+    while (finderBreadcrumbsRef.current.length > 0 && guard < 32) {
+      finderGoUpRef.current();
+      guard += 1;
+    }
+  }, []);
 
   // 面包屑导航回调
   const handleBreadcrumbNavigate = useCallback((index: number) => {
