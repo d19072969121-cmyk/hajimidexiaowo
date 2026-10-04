@@ -77,10 +77,21 @@ export const PracticeHubPage: React.FC<PracticeHubPageProps> = ({
   const ready = useMemo(() => isQuestionBankReady(config), [config]);
   const headerTitle = t('practiceHub.title', '刷题');
 
+  /**
+   * 顶栏。
+   *
+   * ⚠️ `suppressGlobalBackButton: true` 是必需的：刷题页是 practice 路径的**根页**，
+   *    没有「上一页」可回。不抑制时统一顶栏会渲染全局返回按钮
+   *    （UnifiedMobileHeader.tsx 的兜底分支），用户会看到左上角一个
+   *    点了不知道去哪的返回箭头。
+   *
+   *    与 CapturePage / ReviewHubPage 同一个 bug class。
+   */
   useMobileHeader(
     'practice-hub',
     {
       title: headerTitle,
+      suppressGlobalBackButton: true,
       showBackArrow: Boolean(onBack),
       onMenuClick: onBack,
     },

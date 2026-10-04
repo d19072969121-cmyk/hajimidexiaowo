@@ -171,10 +171,23 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
 
   const headerTitle = t('reviewHub.title', '复习');
 
+  /**
+   * 顶栏。
+   *
+   * ⚠️ `suppressGlobalBackButton: true` 是必需的：复习页是 review Tab 的**根页**，
+   *    没有「上一页」可回。不抑制时统一顶栏会渲染全局返回按钮
+   *    （UnifiedMobileHeader.tsx 的兜底分支：`!suppressGlobalBackButton
+   *    && !showBackArrowButton && !showMenuButton`），用户会看到左上角一个
+   *    点了不知道去哪的返回箭头。
+   *
+   *    与 CapturePage（拍题页）同一个 bug class——拍题页当初就是这么修的，
+   *    review-hub 当时漏了。新增 Tab 根页时务必一并设置。
+   */
   useMobileHeader(
     'review-hub',
     {
       title: headerTitle,
+      suppressGlobalBackButton: true,
       showBackArrow: Boolean(onBack),
       onMenuClick: onBack,
     },
