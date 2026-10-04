@@ -22,6 +22,13 @@
 name: DIY Android APK
 
 on:
+  # [E8] 增加 push 触发：本仓库的 token 有 Actions 读权限但**缺 workflow 写权限**，
+  # 无法用 API dispatch（403 Resource not accessible by personal access token）。
+  # 加 push 触发后，推代码即自动构建 —— 不必依赖有人去网页点「Run workflow」。
+  # 仅限本分支，避免误触发上游分支的构建。
+  push:
+    branches:
+      - diy/m1-build-baseline
   workflow_dispatch:
     inputs:
       ref:
