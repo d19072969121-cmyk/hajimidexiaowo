@@ -1333,14 +1333,18 @@ mod tests {
     #[test]
     fn parse_expires_at_handles_naive_and_aware() {
         // 无时区字符串按 UTC 解释
+        // ⚠️ `parse_expires_at` 返回 `Option<i64>`，断言必须用 `Some(...)` 包裹 ——
+        //    原稿写成裸 i64 导致 E0308（该单测从未编译过，故一直没暴露）。
         assert_eq!(
             parse_expires_at(Some("2026-10-05T07:30:20")),
-            chrono::NaiveDate::from_ymd_opt(2026, 10, 5)
-                .unwrap()
-                .and_hms_opt(7, 30, 20)
-                .unwrap()
-                .and_utc()
-                .timestamp()
+            Some(
+                chrono::NaiveDate::from_ymd_opt(2026, 10, 5)
+                    .unwrap()
+                    .and_hms_opt(7, 30, 20)
+                    .unwrap()
+                    .and_utc()
+                    .timestamp()
+            )
         );
         // 带偏移按真实时区换算（+08:00 比 UTC 早 8 小时，故时间戳更小）
         let with_offset = parse_expires_at(Some("2026-10-05T07:30:20+08:00")).unwrap();
