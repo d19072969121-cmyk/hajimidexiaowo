@@ -369,8 +369,14 @@ struct ItemsResponse {
 ///   不要 `innerHTML` 直插。非 html 版本优先。
 /// - `image_urls` 是**绝对 URL 数组**，可直接引用。
 /// - `subquestions` 是复合题子题，**必须与父题保持在一起**渲染。
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+// ⚠️ **只对 Serialize 用 camelCase**（前端读 camelCase），
+//    **反序列化必须用上游原样**（上游返回 `title_html`/`image_urls` 等 snake_case）。
+//    若两向都 rename_all = "camelCase"，`serde_json::from_value` 会去找
+//    `titleHtml` → 全部字段解析失败 → 而调用点是
+//    `filter_map(|raw| from_value(raw).ok())` **静默吞错** → 用户看到「0 道题」。
+//    这是 CI run #14 的教训（当时还只缺 Deserialize 派生，加派生后此陷阱才显形）。
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct QuestionBankQuestion {
     pub id: Option<i64>,
     pub title: Option<String>,
@@ -1144,11 +1150,23 @@ pub async fn question_bank_search_questions(
     let parsed: ItemsResponse = serde_json::from_value(value)
         .map_err(|_| AppError::network("题庄搜题返回了无法解析的响应体（接口可能已变更）"))?;
 
-    let items: Vec<QuestionBankQuestion> = parsed
-        .items
-        .into_iter()
-        .filter_map(|raw| serde_json::from_value(raw).ok())
-        .collect();
+    // ⚠️ 不要用 `filter_map(|raw| from_value(raw).ok())` ——
+    //    它把「字段名不匹配 / 上游改结构」这类**真实故障静默变成空列表**，
+    //    用户只会看到「没找到同类题」，而实际是解析全失败（永远查不出来）。
+    //    这里改为：**逐条解析，失败即报错并带上位置与原因**。
+    let mut items: Vec<QuestionBankQuestion> = Vec::with_capacity(parsed.items.len());
+    for (idx, raw) in parsed.items.into_iter().enumerate() {
+        match serde_json::from_value::<QuestionBankQuestion>(raw) {
+            Ok(q) => items.push(q),
+            Err(e) => {
+                return Err(AppError::network(format!(
+                    "题庄搜题返回体中第 {} 条无法解析（接口可能已变更）：{}",
+                    idx + 1,
+                    e
+                )));
+            }
+        }
+    }
 
     let billed_count = items.len();
 
@@ -1177,6 +1195,57 @@ fn normalize_limit(limit: Option<u32>) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 回归：QuestionBankQuestion 必须能**反序列化上游的 snake_case**。
+    ///
+    /// CI run #14 的教训（两层）：
+    /// 1. 该结构原本只 `derive(Serialize)`，缺 `Deserialize` → 编译错 E0277；
+    /// 2. 补上派生后若 `rename_all = "camelCase"` 对**两个方向都生效**，
+    ///    反序列化会去找 `titleHtml` 而上游给的是 `title_html` → **字段全失败**，
+    ///    而调用点原先用 `filter_map(..ok())` **静默吞错** → 用户只看到「0 道题」。
+    /// 故此处用真实上游形状断言，锁死「反序列化走原样字段名」。
+    #[test]
+    fn parses_upstream_snake_case_question() {
+        let raw = serde_json::json!({
+            "id": 37561799,
+            "title": "题干 $x^2$",
+            "title_html": "<p>题干</p>",
+            "options": ["A. 1", "B. 2"],
+            "answer": "A",
+            "analysis": "解析",
+            "question_type": "选择题",
+            "difficulty": 3,
+            "subject_id": 2,
+            "grade_id": 8,
+            "knowledges": ["一次函数"],
+            "image_urls": ["https://example.com/a.png"],
+            "content_hash": "abc",
+            "has_images": true,
+            "subquestions": []
+        });
+        let q: QuestionBankQuestion = serde_json::from_value(raw)
+            .expect("上游 snake_case 必须能反序列化（rename_all 只应对 Serialize 生效）");
+        assert_eq!(q.id, Some(37561799));
+        assert_eq!(q.title.as_deref(), Some("题干 $x^2$"));
+        assert_eq!(q.title_html.as_deref(), Some("<p>题干</p>"));   // ← camelCase 会在此失败
+        assert_eq!(q.question_type.as_deref(), Some("选择题"));
+        assert_eq!(q.image_urls.as_ref().map(|v| v.len()), Some(1));
+        assert_eq!(q.content_hash.as_deref(), Some("abc"));
+    }
+
+    /// 回归：序列化给前端时必须是 **camelCase**（前端读 `billedCount` 等）。
+    #[test]
+    fn serializes_question_as_camel_case() {
+        let q = QuestionBankQuestion {
+            title_html: Some("<p>x</p>".into()),
+            question_type: Some("选择题".into()),
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&q).unwrap();
+        assert!(v.get("titleHtml").is_some(), "序列化必须是 camelCase：{v}");
+        assert!(v.get("questionType").is_some(), "序列化必须是 camelCase：{v}");
+        assert!(v.get("title_html").is_none());
+    }
 
     #[test]
     fn build_url_uses_trial_prefix_only_for_non_meta_paths() {
