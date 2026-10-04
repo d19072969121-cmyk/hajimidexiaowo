@@ -70,6 +70,7 @@ import {
   type BankSearchParams,
 } from '../questionBank/bankClient';
 import { isQuestionBankReady } from '../questionBank/config';
+import { MetaPicker } from '../questionBank/MetaPicker';
 import { useQuestionBankConfig } from '../questionBank/useQuestionBankConfig';
 
 // ============================================================================
@@ -132,8 +133,6 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
   /** `by-category`：当前选中的元数据（学科/年级） */
   const [subjectId, setSubjectId] = useState<number | undefined>(undefined);
   const [gradeId, setGradeId] = useState<number | undefined>(undefined);
-  const [subjects, setSubjects] = useState<BankMetaItem[]>([]);
-  const [grades, setGrades] = useState<BankMetaItem[]>([]);
 
   const headerTitle = mode === 'review-variants'
     ? t('practiceSession.reviewVariants', '温故新知')
@@ -207,21 +206,7 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
     await runSearch({ keyword });
   }, [resolveSourceQuestion, runSearch]);
 
-  /** 自己定类型：拉元数据（免费接口，不消费额度） */
-  useEffect(() => {
-    if (mode !== 'by-category' || !ready || !isLoaded) return;
-    let cancelled = false;
-    void (async () => {
-      const [s, g] = await Promise.all([
-        fetchQuestionBankMetaOutcome('subjects', undefined, { isConfigured: ready }),
-        fetchQuestionBankMetaOutcome('grades', undefined, { isConfigured: ready }),
-      ]);
-      if (cancelled) return;
-      if (s.kind === 'ok') setSubjects(s.items);
-      if (g.kind === 'ok') setGrades(g.items);
-    })();
-    return () => { cancelled = true; };
-  }, [mode, ready, isLoaded]);
+  // 元数据由 `MetaPicker` 自行拉取（含五态分流与防循环），本页不再重复请求。
 
   /** 首屏自动开跑（两种模式各自的第一步） */
   useEffect(() => {
@@ -280,52 +265,34 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
           <div className="text-[11px] text-muted-foreground">
             {t('practiceSession.scopeLabel', '选择题库范围')}
           </div>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {subjects.map((s) => {
-              const id = normalizeNumeric(s.id);
-              if (id === null) return null;
-              const active = subjectId === id;
-              return (
-                <button
-                  key={`sub-${id}`}
-                  type="button"
-                  data-testid={`practice-session-subject-${id}`}
-                  onClick={() => setSubjectId(active ? undefined : id)}
-                  className={cn(
-                    'rounded-full border px-2.5 py-1 text-xs transition-colors',
-                    active
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:bg-accent',
-                  )}
-                >
-                  {String(s.name ?? '')}
-                </button>
-              );
-            })}
+          {/*
+            ⚠️ 用 `MetaPicker`，不在此内联选择器：
+            它已带 32 个契约测试（`questionBankMetaContract.test.tsx`）、
+            五态分流（loading/unconfigured/error/zero/ok），
+            以及**防级联参数导致无限取数循环**（serializeParams + 固定字段序）。
+            内联实现这些都要重做且无契约保护。
+          */}
+          <div className="mt-2">
+            <MetaPicker
+              kind="subjects"
+              label={t('practiceSession.subjectLabel', '学科')}
+              value={subjectId}
+              onChange={(id) => setSubjectId(typeof id === 'number' ? id : undefined)}
+              isConfigured={ready}
+              onConfigure={onConfigureQuestionBank}
+            />
           </div>
-          {grades.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {grades.map((g) => {
-                const id = normalizeNumeric(g.id);
-                if (id === null) return null;
-                const active = gradeId === id;
-                return (
-                  <button
-                    key={`grade-${id}`}
-                    type="button"
-                    data-testid={`practice-session-grade-${id}`}
-                    onClick={() => setGradeId(active ? undefined : id)}
-                    className={cn(
-                      'rounded-full border px-2.5 py-1 text-xs transition-colors',
-                      active
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border text-muted-foreground hover:bg-accent',
-                    )}
-                  >
-                    {String(g.name ?? '')}
-                  </button>
-                );
-              })}
+          {subjectId !== undefined && (
+            <div className="mt-2">
+              <MetaPicker
+                kind="grades"
+                label={t('practiceSession.gradeLabel', '年级')}
+                value={gradeId}
+                params={{ subjectId }}
+                onChange={(id) => setGradeId(typeof id === 'number' ? id : undefined)}
+                isConfigured={ready}
+                onConfigure={onConfigureQuestionBank}
+              />
             </div>
           )}
           <DsButton
