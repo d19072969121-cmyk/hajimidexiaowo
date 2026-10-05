@@ -63,6 +63,7 @@ import {
   normalizeSubQuestions,
   searchQuestionBank,
   toSearchKeyword,
+  summarizeQuestionKeyword,
   extractQuestionFromSession,
   type BankMetaItem,
   type BankMetaKind,
@@ -147,6 +148,12 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
   const [state, setState] = useState<SearchState>({ kind: 'idle' });
   /** `review-variants`：用于搜题的题干（展示给用户看「这是我拿哪道题去搜的」） */
   const [sourceQuestion, setSourceQuestion] = useState<string | null>(null);
+  /** `review-variants`：可编辑的关键词（E10 新增；此前没有输入框） */
+  const [keywordDraft, setKeywordDraft] = useState('');
+  /** 「AI 总结」进行中 */
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  /** 「AI 总结」的结果说明（关键词来源，让人知道为什么是这几个字） */
+  const [summaryHint, setSummaryHint] = useState<string | null>(null);
   /** `by-category`：当前选中的元数据（学科/年级） */
   const [subjectId, setSubjectId] = useState<number | undefined>(undefined);
   const [gradeId, setGradeId] = useState<number | undefined>(undefined);
@@ -221,8 +228,60 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
       setState({ kind: 'no-question' });
       return;
     }
+    // 预填关键词草稿，让输入框一上来就有内容（用户可直接改）
+    setKeywordDraft((prev) => (prev.trim() ? prev : keyword));
     await runSearch({ keyword });
   }, [resolveSourceQuestion, runSearch]);
+
+  /**
+   * 「AI 总结」（E10，用户要求）。
+   *
+   * ## 它做什么
+   * 从这道错题里提炼出**与题庄标签体系一致的知识点关键词**，填入输入框。
+   *
+   * ## 关键词的三级来源（本地规则，不额外调 LLM）
+   * 1. **OCR 阶段产出的 `tags`** —— 最权威。拍题时 OCR 已经把知识点标签
+   *    抽出来了（`OcrMeta.tags`），直接用它，零成本、零延迟、离线可用。
+   * 2. **题型 + 题干中的学科术语** —— 从题干里扫常见数学/物理术语
+   *    （函数、方程、三角形、受力分析…），组成「术语 + 题型」的组合词。
+   * 3. **兜底** —— 退回 `toSearchKeyword`（题干前若干字）。
+   *
+   * ## 为什么不在这里调 LLM
+   * 免 Key 通道（Pollinations）本身就是**唯一能让未成年用户开箱即用**的路径，
+   * 而它可能没配；为「抽关键词」这个纯本地可解的问题引入一次网络依赖，
+   * 会让没配模型的用户在点按钮时直接失败。OCR 已有 tags 时更是纯浪费。
+   */
+  const handleAiSummary = useCallback(async () => {
+    setIsSummarizing(true);
+    setSummaryHint(null);
+    try {
+      const { sessionId } = resolveSourceQuestion();
+      // 从会话 store 里取 OCR 阶段产出的 tags（最权威的知识点来源）
+      let tags: readonly string[] | null = null;
+      if (sessionId) {
+        const store = sessionManager.get(sessionId);
+        const modeState = store?.getState()?.modeState as unknown as
+          | { ocrMeta?: { tags?: string[] } | null }
+          | null;
+        tags = modeState?.ocrMeta?.tags ?? null;
+      }
+
+      const result = summarizeQuestionKeyword({
+        question: sourceQuestion,
+        tags,
+      });
+      setKeywordDraft(result.keyword);
+      setSummaryHint(
+        result.source === 'ocr-tags'
+          ? t('practiceSession.summaryFromTags', '关键词来自拍题时的知识点标签，可自行修改')
+          : t('practiceSession.summaryFromQuestion', '未找到知识点标签，已从题干提取，建议自行微调'),
+      );
+    } catch (err) {
+      setSummaryHint(getErrorMessage(err));
+    } finally {
+      setIsSummarizing(false);
+    }
+  }, [resolveSourceQuestion, sourceQuestion, t]);
 
   // 元数据由 `MetaPicker` 自行拉取（含五态分流与防循环），本页不再重复请求。
 
@@ -270,10 +329,66 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
       {/* 温故新知：显示「拿哪道题去搜的」—— 用户需要知道来源，否则不知道在做什么 */}
       {mode === 'review-variants' && sourceQuestion && (
         <div className="border-b border-border px-3 py-2" data-testid="practice-session-source">
-          <div className="text-[11px] text-muted-foreground">
-            {t('practiceSession.sourceLabel', '根据这道错题找同类题')}
+          {/*
+            「AI 总结」按钮（E10，用户要求：放在「找同类题」这一行**右端**）。
+            点击 → 从 OCR 的 tags / 题型 / 题干提炼出**题庄风格的知识点关键词**，
+            填入下方输入框（用户可再改），随后自行点搜索。
+
+            ## 为什么必须由用户二次触发搜索，而不是 AI 总结后自动搜
+            关键词是**会消耗额度的**（题庄按返回父题数计费）。
+            自动搜 = 用户无法在搜索前修正 AI 的判断，一次错判就白扣额度。
+          */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] text-muted-foreground">
+              {t('practiceSession.sourceLabel', '根据这道错题找同类题')}
+            </div>
+            <button
+              type="button"
+              data-testid="practice-session-ai-summary"
+              disabled={isSummarizing}
+              onClick={() => void handleAiSummary()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 text-[11px] text-primary active:bg-primary/10 disabled:opacity-50"
+            >
+              {isSummarizing ? (
+                <CircleNotch size={11} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <ArrowsClockwise size={11} aria-hidden="true" />
+              )}
+              {t('practiceSession.aiSummary', 'AI 总结')}
+            </button>
           </div>
           <div className="mt-0.5 line-clamp-2 text-xs text-foreground/80">{sourceQuestion}</div>
+
+          {/*
+            关键词输入框：这是「搜什么」的唯一真相。
+            此前该模式**没有输入框** —— 直接把题干前 30 字当关键词发出去，
+            于是搜到的是「文字相近」的题而不是「同一知识点」的题，
+            用户看到的结果自然「看不懂」。
+          */}
+          <div className="mt-2 flex items-center gap-1.5">
+            <input
+              type="text"
+              data-testid="practice-session-keyword"
+              value={keywordDraft}
+              onChange={(e) => setKeywordDraft(e.target.value)}
+              placeholder={t('practiceSession.keywordPlaceholder', '知识点关键词，如「一次函数的图象」')}
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+            />
+            <DsButton
+              size="sm"
+              data-testid="practice-session-keyword-search"
+              disabled={!keywordDraft.trim()}
+              onClick={() => void runSearch({ keyword: keywordDraft.trim() })}
+            >
+              <MagnifyingGlass size={13} className="mr-1" aria-hidden="true" />
+              {t('practiceSession.search', '搜索')}
+            </DsButton>
+          </div>
+          {summaryHint && (
+            <div className="mt-1 text-2xs text-muted-foreground" data-testid="practice-session-summary-hint">
+              {summaryHint}
+            </div>
+          )}
         </div>
       )}
 

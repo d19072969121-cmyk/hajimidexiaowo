@@ -561,3 +561,98 @@ export function toSearchKeyword(question: string, maxLen = 30): string {
   s = s.replace(/^[（(【\[、。．，,;；:：]+/, '').replace(/[）)】\]、。．，,;；:：]+$/, '').trim();
   return s.length > maxLen ? s.slice(0, maxLen) : s;
 }
+
+/**
+ * 学科术语表（用于「AI 总结」的本地关键词提炼）。
+ *
+ * ## 为什么是「术语表 + 最长匹配」而不是把题干整段丢给搜索
+ * 题庄的 `keyword` 是**对知识点标签做匹配**的（实测：用某题的
+ * `knowledges` 值回搜，3/3 命中同一知识点的题）。
+ * 而把题干前 30 字直接当关键词发出去，匹配的是「文字相近」，
+ * 于是返回一堆看似相关、实则不同知识点的题 —— 用户的原话是
+ * 「点击搜索无用，额度减少，但是返回看不懂」。
+ *
+ * 术语表取的是**初中数学/物理的常见知识点词**（题庄的主力学段）。
+ *
+ * ## ⚠️ 顺序不需要人工维护
+ * 匹配取**第一个**命中项，因此必须「长词在前」（否则「三角函数」会先于
+ * 「锐角三角函数」命中，关键词退化得更泛 → 搜索结果更杂）。
+ * 这个不变量**由 `SUBJECT_TERMS_SORTED` 在运行时保证** ——
+ * 下方数组按人读得懂的方式（按主题分组）书写即可，
+ * 不再需要作者手工把自己插到正确位置。
+ * （首版就是靠人工顺序，实测立刻排错了：「三角函数」跑到了
+ *  「一元二次方程」前面，回归测试当场抓出。）
+ */
+const SUBJECT_TERMS: readonly string[] = [
+  // 数学 · 函数与代数（长词在前，保证最长匹配）
+  '反比例函数与一次函数的交点问题', '二次函数的图象与性质',
+  '锐角三角函数', '正比例函数', '反比例函数',
+  '一次函数', '二次函数', '三角函数',
+  '一元二次方程', '二元一次方程组', '一元一次方程', '分式方程', '不等式组',
+  '因式分解', '整式的乘法', '分式的化简', '二次根式', '实数运算',
+  '化简求值', '解直角三角形',
+  '直角三角形的性质', '相似三角形', '全等三角形', '等腰三角形',
+  '等边三角形', '勾股定理', '三角形的中位线',
+  '平行四边形的性质', '矩形的性质', '菱形的性质', '正方形的性质',
+  '圆的性质', '切线的判定', '圆周角定理', '垂径定理', '弧长与扇形面积',
+  '翻折变换', '旋转变换', '平移变换', '轴对称', '中心对称',
+  '统计与概率', '平均数与中位数', '方差', '频数分布',
+  // 物理
+  '受力分析', '牛顿第一定律', '二力平衡', '压强', '浮力', '功和功率',
+  '机械效率', '欧姆定律', '电功率', '串并联电路', '光的折射', '光的反射',
+  '凸透镜成像', '密度计算',
+];
+
+/**
+ * `SUBJECT_TERMS` 的**长度降序副本** —— 保证「最长匹配」这一不变量。
+ *
+ * 只算一次（模块加载时），不影响调用开销。
+ * 用它匹配即可保证：题干含「锐角三角函数」时命中它而不是更短的「三角函数」。
+ */
+const SUBJECT_TERMS_SORTED: readonly string[] = [...SUBJECT_TERMS]
+  .sort((a, b) => b.length - a.length);
+
+/**
+ * 「AI 总结」的关键词提炼（纯函数，可单测）。
+ *
+ * ## 输入
+ * - `question`：题干（可为 null，此时只能用 tags）
+ * - `tags`：拍题时 OCR 产出的知识点标签（**最权威来源**）
+ *
+ * ## 输出
+ * - `keyword`：应填入搜索框的关键词
+ * - `source`：关键词来源，供 UI 解释「为什么是这几个字」
+ *
+ * ## 优先级
+ * 1. tags 里**最长**的一个（标签本身就是知识点，直接用）
+ * 2. 题干里命中的最长术语（术语表最长匹配）
+ * 3. 退化为 `toSearchKeyword`（题干前 30 字）
+ */
+export function summarizeQuestionKeyword(input: {
+  question?: string | null;
+  tags?: readonly string[] | null;
+}): { keyword: string; source: 'ocr-tags' | 'question-term' | 'fallback' } {
+  // 1) OCR 标签优先：本身就是知识点，不需要再猜
+  const tags = (input.tags ?? [])
+    .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+    .filter((tag) => tag.length > 0);
+  if (tags.length > 0) {
+    // 取最长的那个：标签越长通常越具体（「一次函数」< 「一次函数的图象与性质」）
+    const best = tags.reduce((a, b) => (b.length > a.length ? b : a));
+    return { keyword: best, source: 'ocr-tags' };
+  }
+
+  const question = typeof input.question === 'string' ? input.question : '';
+
+  // 2) 题干术语匹配（最长优先：用运行时排序过的副本，
+  //    故第一个命中即为最长命中 —— 不依赖数组书写顺序）
+  for (const term of SUBJECT_TERMS_SORTED) {
+    if (question.includes(term)) {
+      return { keyword: term, source: 'question-term' };
+    }
+  }
+
+  // 3) 兜底
+  return { keyword: toSearchKeyword(question), source: 'fallback' };
+}
+
