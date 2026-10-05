@@ -192,7 +192,7 @@ describe('QuestionBankApiSection：去配置 / 已配置 状态机', () => {
     expect(btn).toHaveTextContent('去配置');
   });
 
-  it('已配置时按钮显示「已配置」且 disabled', async () => {
+  it('已配置时按钮显示「已配置」且**仍可点**（E9：原需求「配了就禁用」导致改不了）', async () => {
     mockInvoke.mockResolvedValue(
       JSON.stringify({
         provider: 'cn21',
@@ -203,8 +203,52 @@ describe('QuestionBankApiSection：去配置 / 已配置 状态机', () => {
 
     const btn = await screen.findByTestId('question-bank-status-button');
     await waitFor(() => expect(btn).toHaveAttribute('data-configured', 'true'));
-    expect(btn).toBeDisabled();
+    // ⚠️ E9 契约变更：**不再** disabled。
+    // 用户实测反馈「题库配置后没有修改按钮」——原 disabled 让配好的用户
+    // 再也进不去面板改配置。只有「加载中」才不可点。
+    expect(btn).not.toBeDisabled();
     expect(btn).toHaveTextContent('已配置');
+  });
+
+  it('已配置时仍能展开面板修改（E9 回归防护）', async () => {
+    mockInvoke.mockResolvedValue(
+      JSON.stringify({
+        provider: 'cn21',
+        credentials: { cn21: { accessKey: 'k', baseUrl: 'https://x' } },
+      }),
+    );
+    render(<QuestionBankApiSection />);
+
+    const btn = await screen.findByTestId('question-bank-status-button');
+    await waitFor(() => expect(btn).toHaveAttribute('data-configured', 'true'));
+    fireEvent.click(btn);
+
+    // 能进面板 = 能改配置。这正是问题 ③ 的修复点。
+    expect(screen.getByTestId('question-bank-config-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('question-bank-field-accessKey')).toBeInTheDocument();
+  });
+
+  it('已配置时提供「清除配置」按钮，且需二次确认（E9 用户要求）', async () => {
+    mockInvoke.mockResolvedValue(
+      JSON.stringify({
+        provider: 'cn21',
+        credentials: { cn21: { accessKey: 'k', baseUrl: 'https://x' } },
+      }),
+    );
+    render(<QuestionBankApiSection />);
+
+    const btn = await screen.findByTestId('question-bank-status-button');
+    await waitFor(() => expect(btn).toHaveAttribute('data-configured', 'true'));
+    fireEvent.click(btn);
+
+    // 第一次点击只进入确认态，不清除（清的是加密存储的 accessKey，必须防误触）
+    fireEvent.click(screen.getByTestId('question-bank-clear'));
+    expect(screen.getByTestId('question-bank-clear-confirm')).toBeInTheDocument();
+    expect(screen.queryByTestId('question-bank-clear-ok')).toBeInTheDocument();
+
+    // 取消可退回
+    fireEvent.click(screen.getByTestId('question-bank-clear-cancel'));
+    expect(screen.queryByTestId('question-bank-clear-confirm')).not.toBeInTheDocument();
   });
 
   it('点「去配置」展开配置面板（三个预设来源齐全）', async () => {

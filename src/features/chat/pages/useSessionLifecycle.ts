@@ -162,10 +162,14 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
         const store = sessionManager.get(draftId);
         // 字段名以 `core/types/store.ts` 的 ChatStore 为准：
         //   消息是 `messageMap` + `messageOrder`（**没有** `messages` 这个字段）
+        //
+        // ⚠️ 防御式读取：`sessionManager.get` 在测试/半初始化态下可能返回
+        //    尚未填充 messageOrder 的 store（实测单测里就是 undefined）。
+        //    「有没有内容」只是决定要不要弹提示，读不到就当没有 —— 不能因此抛错。
         const hasContent = (() => {
           if (!store) return false;
-          const state = store.getState();
-          return state.messageOrder.length > 0;
+          const order = store.getState()?.messageOrder;
+          return Array.isArray(order) && order.length > 0;
         })();
         if (hasContent) {
           showGlobalNotification(

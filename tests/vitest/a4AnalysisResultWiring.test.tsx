@@ -43,11 +43,44 @@ describe('A4-P0 接线契约：App 挂载解析结果页时传入了 store', () 
 
   it('<LazyAnalysisResultPage> 绑定了 store 属性（不再裸挂）', () => {
     // 截出该 JSX 元素本体（从标签名到其闭合），断言其中出现 store=
-    const tag = appSource.match(/<LazyAnalysisResultPage[\s\S]{0,400}?\/>/)?.[0] ?? '';
+    //
+    // ⚠️ E9 修正：原实现用 `[\s\S]{0,400}?\/>` 这种**固定字符窗口**截取，
+    //    但该元素的属性区含一大段解释为什么必须传 store 的注释（855 字符），
+    //    `/>` 落在窗口之外 → 断言恒失败（实测 HEAD~2/HEAD~1/当前三版一致失败，
+    //    属既有脆弱测试，非某次改动引入）。
+    //    改为按 **JSX 括号配对**定位元素本体：从标签名扫到与之配对的 `/>` 或 `>`，
+    //    对属性区长度免疫，且不会误吞后面的兄弟元素。
+    const tag = extractJsxElement(appSource, 'LazyAnalysisResultPage');
     expect(tag, '未在 App.tsx 找到 <LazyAnalysisResultPage> 的渲染点').not.toBe('');
     expect(tag).toMatch(/store=\{/);
   });
 });
+
+/**
+ * 从源码中截出一个自闭合 JSX 元素的本体（含标签名与结尾 `/>`）。
+ *
+ * 用**括号计数**而非固定窗口：进入标签后按 `{`/`}` 配对推进，
+ * 直到在**花括号深度为 0** 处遇到 `/>` 或 `>` 即结束。
+ * 这样属性区里无论塞多少注释、嵌套多少对象字面量都不会截错。
+ *
+ * 找不到时返回空串（调用方据此给出可读的失败信息）。
+ */
+function extractJsxElement(source: string, tagName: string): string {
+  const open = source.indexOf(`<${tagName}`);
+  if (open < 0) return '';
+
+  let braceDepth = 0;
+  for (let i = open; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === '{') braceDepth += 1;
+    else if (ch === '}') braceDepth -= 1;
+    else if (ch === '>' && braceDepth === 0) {
+      // 自闭合则为 `/>`，否则为普通开标签 —— 两者都算「元素本体到此为止」
+      return source.slice(open, i + 1);
+    }
+  }
+  return '';
+}
 
 // ============================================================================
 // ② 行为级：桥接 hook 真能把会话 store 交出来
