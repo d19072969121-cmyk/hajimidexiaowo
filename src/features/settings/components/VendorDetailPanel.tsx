@@ -182,16 +182,38 @@ const ResponsiveInlineEditorHost: React.FC<{
       aria-label={floating ? ariaLabel : undefined}
       className={cn(
         floating &&
-          'fixed inset-0 z-overlay flex min-h-0 items-start justify-center bg-black/40 p-4 sm:py-8'
+          // E10 移动端适配：手机上是**贴底全宽 sheet**，不再是四边留白的居中卡片。
+          // 原实现 `items-start justify-center p-4` + 固定 760px 高，
+          // 在手机上表现为「一个大盒子悬在顶部、四周留白、内容溢出」——
+          // 用户原话「打开那个界面感觉和安卓端不适配，太大了」。
+          // 现在与项目其它移动弹窗（DsDialog 的 sheet 形态）对齐：
+          //   · <640px：贴底、圆角只在上方、左右不留白
+          //   · ≥640px：恢复居中的浮层卡片
+          'fixed inset-0 z-overlay flex min-h-0 bg-black/40 ' +
+          'items-end justify-center p-0 ' +
+          'sm:items-start sm:justify-center sm:p-4 sm:py-8'
       )}
     >
       <div
         data-testid={surfaceTestId}
         className={cn(
           floating &&
-            'relative z-modal h-[min(760px,calc(100dvh-2rem))] min-h-0 w-full max-w-[672px] overflow-hidden rounded-lg border border-border/60 bg-background shadow-2xl sm:h-[min(760px,calc(100dvh-4rem))]'
+            'relative z-modal min-h-0 w-full overflow-hidden border-border/60 bg-background shadow-2xl ' +
+            // 手机：贴底 + 只圆上方两角 + 最多占 92dvh（留出状态栏与手势区）
+            '[&]:rounded-t-[24px] max-h-[92dvh] h-auto ' +
+            // 桌面：恢复居中卡片形态（限高 + 全圆角 + 最大宽）
+            'sm:h-[min(760px,calc(100dvh-4rem))] sm:max-h-none sm:max-w-[672px] sm:rounded-lg sm:border'
         )}
       >
+        {/* 移动端顶部把手：暗示「这是一张可下滑关闭的 sheet」，
+            与项目其它 sheet 形态（DsDialog mobile）保持一致 */}
+        {floating && (
+          <div
+            aria-hidden="true"
+            data-testid="vendor-panel-sheet-handle"
+            className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden"
+          />
+        )}
         {children}
       </div>
     </div>
