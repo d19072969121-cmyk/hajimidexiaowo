@@ -1,3 +1,4 @@
+import { isAnalysisFamilyMode } from './modeFamily';
 /**
  * Chat V2 - 题目分析模式插件
  *
@@ -489,7 +490,7 @@ async function autoSendFirstMessage(
  * @returns 是否允许发送
  */
 export function canSendInAnalysisMode(store: ChatStore): boolean {
-  if (store.mode !== 'analysis') {
+  if (!isAnalysisFamilyMode(store.mode)) {
     return true;
   }
 
@@ -514,7 +515,7 @@ export function canSendInAnalysisMode(store: ChatStore): boolean {
  * @returns OCR 状态或 null
  */
 export function getAnalysisOcrStatus(store: ChatStore): OcrStatus | null {
-  if (store.mode !== 'analysis') {
+  if (!isAnalysisFamilyMode(store.mode)) {
     return null;
   }
 
@@ -532,7 +533,7 @@ export async function retryOcr(
   store: ChatStore,
   images?: string[]
 ): Promise<void> {
-  if (store.mode !== 'analysis') {
+  if (!isAnalysisFamilyMode(store.mode)) {
     throw new Error(i18n.t('chatV2:mode.analysis.retryOnlyInAnalysis'));
   }
 

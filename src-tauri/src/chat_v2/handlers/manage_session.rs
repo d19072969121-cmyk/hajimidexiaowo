@@ -245,9 +245,15 @@ pub async fn chat_v2_create_session(
 
     // 验证模式
     // 🔧 P0修复：添加 "chat" 模式（前端使用的标准模式名）
+    // ⚠️ E8：新增前端模式插件时**必须同步此白名单**，否则前端传新 mode 会被此校验拒绝：
+    //    "Validation error: Invalid session mode: solver. Valid modes: [...]"
+    //    （实测：拍题点「开始解析」即报此错，因为前端 solver 插件没在后端登记）
     let valid_modes = [
         "chat", // 前端标准聊天模式
         "analysis",
+        // E8：拍题解题 agent（前端 `plugins/modes/solver.ts`，extends analysis）。
+        // 后端把它当 analysis 同族处理（OCR 前置 + 学习域压缩模板）。
+        "solver",
         "review",
         "textbook",
         "bridge",
@@ -2003,6 +2009,7 @@ mod tests {
         let valid_modes = [
             "chat", // 前端标准聊天模式
             "analysis",
+            "solver", // E8：拍题解题 agent（与生产白名单保持同步）
             "review",
             "textbook",
             "bridge",

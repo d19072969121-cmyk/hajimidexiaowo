@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { isAnalysisFamilyMode } from '../plugins/modes';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { Plus, Chat, X, FileText, BookOpen, ClipboardText, Image, File, CircleNotch, DotsSixVertical, Warning, ArrowSquareOut, SquaresFour } from '@phosphor-icons/react';
@@ -575,8 +576,10 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
       setSessionKind('unknown');
       return;
     }
+    // ⚠️ 族判据（含 analysis + solver），不能写死 'analysis' ——
+    //    否则 solver 会话被当普通会话，首页会渲染 OcrResultHeader（① 症状复发）。
     const read = (): 'analysis' | 'other' =>
-      store.getState().mode === 'analysis' ? 'analysis' : 'other';
+      isAnalysisFamilyMode(store.getState().mode) ? 'analysis' : 'other';
     setSessionKind(read());
     // 响应式：会话切换 / 模式变更都要更新（如从 analysis 会话切到普通会话）
     const unsubscribe = store.subscribe((state, prevState) => {

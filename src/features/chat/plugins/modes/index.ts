@@ -16,6 +16,9 @@ export { CHAT_MODE } from './chat';
 export { ANALYSIS_MODE } from './analysis';
 export { SOLVER_MODE } from './solver';
 
+// 族判据抽到独立文件（避免 index 与 analysis 的循环依赖）
+export { ANALYSIS_FAMILY_MODES, isAnalysisFamilyMode } from './modeFamily';
+
 // 导出 solver 的提示词编排（契约测试直接断言步骤结构）
 export { solverSystemPrompt, SOLVER_STEP_HEADINGS } from './solverPrompt';
 

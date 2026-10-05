@@ -30,9 +30,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 import { getErrorMessage } from '@/utils/errorUtils';
+import { isAnalysisFamilyMode } from '@/features/chat/plugins/modes';
 import type { ChatSession } from '@/features/chat/types/session';
 
 /** 拍题解析会话的 mode 标记（见 useSessionLifecycle.ts:218） */
+/**
+ * 错题本口径的 mode 常量。
+ *
+ * ⚠️ **不要只保留 'analysis'**：E8 新增的 `solver`（拍题解题 agent）同样是
+ * 「拍出来的题」，若不计入，用户新拍的题**不会出现在错题本里**。
+ * 判据统一走 `isAnalysisFamilyMode`（见下）。
+ *
+ * 保留 `ANALYSIS_MODE` 导出是为了不破坏既有引用（外部仍可能 import 它）。
+ */
 export const ANALYSIS_MODE = 'analysis';
 
 /** 一次拉取的会话上限：错题本按「最近更新」倒序展示，不需要侧栏那种全量分页 */
@@ -87,7 +97,9 @@ export function toMistakeEntries(sessions: readonly ChatSession[]): MistakeBookE
 
   for (const s of sessions) {
     if (!s || typeof s !== 'object') continue;
-    if (s.mode !== ANALYSIS_MODE) continue;
+    // 族判据：analysis + solver 都算「拍出来的题」
+    // （solver 是 analysis 的增强版，`extends: 'analysis'`）
+    if (!isAnalysisFamilyMode(s.mode)) continue;
     if (!s.id || seen.has(s.id)) continue;
     // 已归档/已删除的会话不进错题本
     if (s.persistStatus && s.persistStatus !== 'active') continue;

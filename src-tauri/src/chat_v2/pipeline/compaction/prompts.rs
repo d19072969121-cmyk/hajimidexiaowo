@@ -119,7 +119,8 @@ pub(crate) static GENERIC_COMPACTION_PROFILE: CompactionPromptProfile = Compacti
 /// 模板；agent / general_chat / 未知模式用通用模板。
 pub(crate) fn compaction_profile_for_mode(mode: Option<&str>) -> &'static CompactionPromptProfile {
     match mode {
-        Some("analysis") | Some("review") | Some("textbook") | Some("bridge") => {
+        // E8：`solver` 是 analysis 的增强版（拍题解题 agent），同属学习域
+        Some("analysis") | Some("solver") | Some("review") | Some("textbook") | Some("bridge") => {
             &LEARNING_COMPACTION_PROFILE
         }
         _ => &GENERIC_COMPACTION_PROFILE,

@@ -78,7 +78,7 @@ import { UserAgreementDialog, useUserAgreement } from './components/legal/UserAg
 import { WelcomeOnboardingDialog, useWelcomeOnboarding } from './components/onboarding/WelcomeOnboardingDialog';
 import { useMigrationStatusListener } from './hooks/useMigrationStatusListener';
 import { useQbankGenerationTasks } from './hooks/useQbankGenerationTasks';
-import { SOLVER_MODE } from './features/chat/plugins/modes';
+import { SOLVER_MODE, isAnalysisFamilyMode } from './features/chat/plugins/modes';
 import useTheme from './hooks/useTheme';
 import { emitDebug, getDebugEnabled } from './utils/emitDebug';
 import { useDialogControl } from './contexts/DialogControlContext';
@@ -1237,7 +1237,9 @@ function App() {
       try {
         const sessionId = sessionManager.getCurrentSessionId();
         const store = sessionId ? sessionManager.get(sessionId) : undefined;
-        if (store && store.getState().mode === 'analysis') {
+        // ⚠️ 必须用**族判据**而非 `=== 'analysis'`：② 新增的 `solver` 模式同为
+        //    解析类会话，写死字符串会漏清它 → 首页残留 OCR 卡片（① 症状复发）。
+        if (store && isAnalysisFamilyMode(store.getState().mode)) {
           sessionManager.setCurrentSessionId(null);
         }
       } catch {

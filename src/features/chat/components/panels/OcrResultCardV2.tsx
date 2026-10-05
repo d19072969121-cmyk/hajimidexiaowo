@@ -20,6 +20,7 @@
  * 消息块渲染（消息分区）或 ChatContainer（主容器分区），见 E-changes.md。
  */
 
+import { isAnalysisFamilyMode } from '../../plugins/modes/modeFamily';
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useStore, type StoreApi } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -229,7 +230,7 @@ export const OcrResultCardV2: React.FC<OcrResultCardV2Props> = ({
   // ========== 条件渲染（Hooks 之后） ==========
 
   // 不是 analysis 模式时不渲染
-  if (mode !== 'analysis') {
+  if (!isAnalysisFamilyMode(mode)) {
     return null;
   }
 
@@ -287,7 +288,7 @@ export const OcrResultCardV2: React.FC<OcrResultCardV2Props> = ({
  */
 export function useOcrMeta(store: StoreApi<ChatStore>): OcrMeta | null {
   return useStore(store, (s: ChatStore) => {
-    if (s.mode !== 'analysis') return null;
+    if (!isAnalysisFamilyMode(s.mode)) return null;
     const modeState = s.modeState as unknown as AnalysisModeState | null;
     return modeState?.ocrMeta ?? null;
   });
@@ -300,7 +301,7 @@ export function useOcrMeta(store: StoreApi<ChatStore>): OcrMeta | null {
  */
 export function useOcrImages(store: StoreApi<ChatStore>): string[] {
   return useStore(store, (s: ChatStore) => {
-    if (s.mode !== 'analysis') return EMPTY_IMAGES;
+    if (!isAnalysisFamilyMode(s.mode)) return EMPTY_IMAGES;
     const modeState = s.modeState as unknown as AnalysisModeState | null;
     return modeState?.images ?? EMPTY_IMAGES;
   });
@@ -311,7 +312,7 @@ export function useOcrImages(store: StoreApi<ChatStore>): string[] {
  */
 export function useOcrStatus(store: StoreApi<ChatStore>): string | null {
   return useStore(store, (s: ChatStore) => {
-    if (s.mode !== 'analysis') return null;
+    if (!isAnalysisFamilyMode(s.mode)) return null;
     const modeState = s.modeState as unknown as AnalysisModeState | null;
     return modeState?.ocrStatus ?? null;
   });
@@ -326,7 +327,7 @@ export function useOcrData(store: StoreApi<ChatStore>) {
   return useStore(
     store,
     useShallow((s: ChatStore) => {
-      if (s.mode !== 'analysis') {
+      if (!isAnalysisFamilyMode(s.mode)) {
         return {
           isAnalysisMode: false as const,
           ocrStatus: null,
