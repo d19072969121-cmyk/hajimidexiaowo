@@ -22,13 +22,21 @@ export default defineConfig({
     // CI 分片曾把单个 worker 顶死在 4096MB（日志约 4001MB 后 OOM），
     // 不是断言失败。CI 提高单进程堆、同时把 forks 上限收成 2，避免
     // 4 worker × 6GB 撑爆 runner；不放宽任何用例。
+    // E13P 实测（2026-10-05）：非 CI 默认 = max(numCpus-1)=7 fork，
+    // 在 11GB 内存机上触到崩溃边界（swap 暴涨 +792MB、MemAvailable 压到
+    // 2.8GB，与 node::TearDownOncePerProcess Aborted 同水位），且吞吐反而
+    // 衰减（7 fork=5.3x vs 2 fork=1.9x 近线性）。故非 CI 也固定 maxForks=2，
+    // 本机可用 VITEST_MAX_FORKS 覆盖。瓶颈主因是每文件 jsdom 环境初始化
+    // （~84% 耗时），详见 analysis/E13P_测试性能诊断.md。
     pool: 'forks',
     poolOptions: {
       forks: {
         execArgv: [
           process.env.CI ? '--max-old-space-size=6144' : '--max-old-space-size=4096',
         ],
-        ...(process.env.CI ? { maxForks: 2 } : {}),
+        maxForks: process.env.VITEST_MAX_FORKS
+          ? parseInt(process.env.VITEST_MAX_FORKS, 10)
+          : 2,
       },
     },
   },
