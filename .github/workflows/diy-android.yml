@@ -552,4 +552,48 @@ jobs:
           overwrite: true
           name: android-arm64
           path: android-output/*.apk
+
+      # 分卷 APK：给「手机侧取包」用的。
+      #
+      # 为什么需要：设备桥的 /app/export 有单文件大小上限（实测 64MB 通过、
+      # 80MB 被 TOO_LARGE 拒），而签名后的 APK 约 105MB —— 单文件推不进手机。
+      # 故出包时切成 60MB 一卷并附校验和，手机侧只需按序拼接：
+      #   cat AI-Study_*.apk.part* > AI-Study.apk && sha256sum -c SHA256SUMS
+      #
+      # ⚠️ 用 split -b 60m（**按二进制字节切**，不是按行）—— 用 `split` 默认的
+      #    行模式会把二进制切坏；-d 让后缀是数字（part00/part01），保证 cat 顺序正确。
+      - name: Split APK into <64MB volumes (for phone-side retrieval)
+        run: |
+          set -euo pipefail
+          cd android-output
+          APK=$(ls *.apk | head -1)
+          test -n "$APK" || { echo "::error::no APK to split"; exit 1; }
+
+          split -b 60m -d -a 2 "$APK" "${APK}.part"
+          sha256sum "$APK" > SHA256SUMS
+          ls -lh
+
+          echo "📦 分卷完成：$(ls ${APK}.part* | wc -l) 卷"
+          echo "拼接方式（手机或电脑）：cat ${APK}.part* > ${APK}"
+          echo "校验方式：sha256sum -c SHA256SUMS"
+
+          # 自证：拼接回来必须与原始 APK 逐字节一致（防止 split 参数写错）
+          cat "${APK}".part* > /tmp/rejoined.apk
+          if ! cmp -s "$APK" /tmp/rejoined.apk; then
+            echo "::error::rejoined APK differs from original — split/cat round-trip broken"
+            exit 1
+          fi
+          echo "✅ 拼接回环校验通过（cmp 逐字节一致）"
+
+      - name: Upload split APK volumes
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-arm64-split
+          path: |
+            android-output/*.part*
+            android-output/SHA256SUMS
+          compression-level: 0
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: error
           retention-days: 30
