@@ -165,6 +165,26 @@ export const ShadApiEditModal: React.FC<ApiEditModalProps> = ({
   mobilePanelMode = false,
 }) => {
   const { t } = useTranslation(['common', 'settings']);
+  /**
+   * 「自定义接口地址」开关（E10）。
+   *
+   * 初始值取「本模型的 baseUrl 是否已经偏离供应商预设」——
+   * 已经改过的模型一打开就应处于覆写态（否则用户会以为自己改的地址丢了）。
+   * 未偏离时默认关闭，保持「跟随供应商」的简洁语义。
+   */
+  const [overrideConnection, setOverrideConnection] = useState(() => {
+    const vendorUrl = lockedVendorInfo?.baseUrl?.trim();
+    const ownUrl = api.baseUrl?.trim();
+    if (!vendorUrl || !ownUrl) return false;
+    return vendorUrl !== ownUrl;
+  });
+  /**
+   * 实际是否隐藏连接字段。
+   *
+   * ⚠️ 原来直接用入参 `hideConnectionFields`，导致模型编辑永远看不到地址。
+   *    现在由「调用方要求隐藏」**且**「用户未勾选覆写」共同决定。
+   */
+  const hideConnection = hideConnectionFields && !overrideConnection;
   const [connectionTest, setConnectionTest] = useState<
     | { state: 'idle' }
     | { state: 'testing' }
@@ -747,7 +767,8 @@ export const ShadApiEditModal: React.FC<ApiEditModalProps> = ({
       showGlobalNotification('warning', t('forms.placeholders.enter_name'));
       return;
     }
-    if (!hideConnectionFields && !formData.baseUrl.trim()) {
+    // 只有字段可见（未隐藏）时才要求 baseUrl 非空 —— 隐藏时沿用供应商地址
+    if (!hideConnection && !formData.baseUrl.trim()) {
       showGlobalNotification('warning', t('forms.placeholders.enter_url'));
       return;
     }
@@ -1066,6 +1087,53 @@ export const ShadApiEditModal: React.FC<ApiEditModalProps> = ({
                         {t('settings:api.modal.model_name_hint')}
                       </p>
                     </div>
+
+                    {/*
+                      「自定义接口地址」开关（E10 新增）。
+                      —— 用户诉求：「在模型服务内允许自定义接口」。
+
+                      ## 背景
+                      此前模型编辑固定传 `hideConnectionFields`，接口地址与密钥字段
+                      被整块隐藏，且 `lockedVendorInfo` 只是个**没渲染过的死参数** ——
+                      用户在模型面板里既看不到地址、也无处改，只能用该供应商的预设地址。
+                      想接自己的中转/自建服务，只能去新建一个供应商，路径太深。
+
+                      ## 做法
+                      默认仍「跟随供应商」（保持既有语义，不打扰不关心的用户）；
+                      勾选后展开 baseUrl / apiKey 两个字段，本模型自行覆写。
+                      这正好对应 `auth_mode: "none"` 的免 Key 场景：
+                      选了免 Key 源之后，把地址换成自己的代理即可。
+                    */}
+                    {hideConnectionFields && (
+                      <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            data-testid={`api-override-connection-${api.id}`}
+                            checked={overrideConnection}
+                            onChange={(e) => setOverrideConnection(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-xs font-medium text-foreground">
+                              {t('settings:api.modal.override_connection', '自定义接口地址')}
+                            </span>
+                            <span className="mt-0.5 block text-2xs text-muted-foreground/70">
+                              {t(
+                                'settings:api.modal.override_connection_hint',
+                                '默认跟随所属供应商。勾选后可为本模型单独指定接口地址与密钥 —— 适用于接入自建中转或其它 OpenAI 兼容服务。',
+                              )}
+                            </span>
+                            {lockedVendorInfo?.baseUrl && !overrideConnection && (
+                              <span className="mt-1 block truncate font-mono text-2xs text-muted-foreground/60">
+                                {t('settings:api.modal.current_connection', '当前')}：
+                                {lockedVendorInfo.baseUrl}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      </div>
+                    )}
                     
                     <div className="space-y-2">
                       <Label className="text-xs font-medium text-muted-foreground/80 ml-1">
@@ -1157,7 +1225,7 @@ export const ShadApiEditModal: React.FC<ApiEditModalProps> = ({
                     </div>
                   </div>
 
-                  {!hideConnectionFields && (
+                  {!hideConnection && (
                     <div className="pt-1">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="h-px flex-1 bg-border/40"></div>

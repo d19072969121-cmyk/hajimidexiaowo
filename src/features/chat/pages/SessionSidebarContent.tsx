@@ -100,7 +100,11 @@ export interface UseSessionSidebarContentDeps {
   isLoadingMore: boolean;
   t: TFunction<any, any>;
   resetDeleteConfirmation: () => void;
-  createSession: (groupId?: string) => Promise<void>;
+  createSession: (
+    groupId?: string,
+    /** forceNew：「+新对话」按钮用。见 useSessionLifecycle 里的说明。 */
+    opts?: { forceNew?: boolean },
+  ) => Promise<void>;
   loadMoreSessions: () => Promise<void>;
   renderSessionItem: (session: ChatSession, drag?: SessionDragState) => React.ReactNode;
   /** 会话拖入分组：提供后启用 dnd-kit DnD（droppable id: session-group:<id> / session-ungrouped） */
@@ -320,7 +324,9 @@ export function useSessionSidebarContent(deps: UseSessionSidebarContentDeps) {
   const handleCreateSession = React.useCallback(() => {
     setViewMode('sidebar');
     setSessionSheetOpen(false);
-    void createSession();
+    // forceNew（E10）：用户点「+新对话」就是要一个**新的空会话**。
+    // 不传的话会被隐藏草稿会话的 scope 判等挡住 → 界面毫无反应。
+    void createSession(undefined, { forceNew: true });
   }, [createSession, setSessionSheetOpen, setViewMode]);
 
   // 移动端进入会话浏览视图（中屏整屏切换，顶栏切为返回箭头）

@@ -1247,7 +1247,7 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
             hint={isSmallScreen ? undefined : t('page.emptyPage.hint')}
             actions={
               <>
-                <DsButton variant="primary" size="sm" className="[@media(pointer:coarse)]:!min-h-11" onClick={() => void createSession()}>
+                <DsButton variant="primary" size="sm" className="[@media(pointer:coarse)]:!min-h-11" onClick={() => void createSession(undefined, { forceNew: true })}>
                   <Plus size={14} />
                   {t('page.newChat')}
                 </DsButton>
@@ -1314,7 +1314,7 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
           onDeleteSession={deleteSession}
           onCreateSession={() => {
             setViewMode('sidebar');
-            void createSession();
+            void createSession(undefined, { forceNew: true });
           }}
           onRenameSession={handleBrowserRenameSession}
           className="h-full flex-1"
@@ -1469,7 +1469,7 @@ export const ChatV2Page: React.FC<ChatV2PageProps> = ({
                 onDeleteSession={deleteSession}
                 onCreateSession={() => {
                   setViewMode('sidebar');
-                  void createSession();
+                  void createSession(undefined, { forceNew: true });
                 }}
                 onRenameSession={handleBrowserRenameSession}
                 className="min-h-0 flex-1"

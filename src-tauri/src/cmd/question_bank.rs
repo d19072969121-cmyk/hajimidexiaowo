@@ -382,7 +382,24 @@ pub struct QuestionBankQuestion {
     pub title: Option<String>,
     pub title_html: Option<String>,
     pub options: Option<serde_json::Value>,
-    pub options_html: Option<String>,
+    /// ⚠️ 必须是 `Value`，**不能**是 `Option<String>`（E10 实测踩坑）。
+    ///
+    /// 上游对填空题返回的是**空对象 `{}`**，不是字符串：
+    /// ```json
+    /// {"question_type":"填空题", "options":{}, "options_html":{}}
+    /// ```
+    /// 声明成 `Option<String>` 时，`serde_json` 无法把 `{}` 解成字符串 →
+    /// **单条反序列化失败 → 整个搜索命令返回错误**
+    /// （症状：「题庄搜题返回体中第 1 条无法解析」，用户看到「搜题失败」，
+    /// 但额度已经扣掉了）。
+    ///
+    /// 实测（2026-10-05，`/v1/trial/questions` 真实响应）：
+    ///   - `title_html` / `answer_html` / `analysis_html`：字符串
+    ///   - `options_html`：**对象**（填空题为 `{}`，选择题为 `{"A": "..."}`）
+    /// 也就是说这个字段的类型**随题型变化**，只有 `Value` 能同时收下两种形态。
+    ///
+    /// 前端消费时须按运行时真实类型处理（见 `BankQuestion.options_html` 的注释）。
+    pub options_html: Option<serde_json::Value>,
     pub answer: Option<serde_json::Value>,
     pub answer_html: Option<String>,
     pub analysis: Option<String>,
@@ -391,6 +408,8 @@ pub struct QuestionBankQuestion {
     pub difficulty: Option<serde_json::Value>,
     pub subject_id: Option<serde_json::Value>,
     pub grade_id: Option<serde_json::Value>,
+    /// 上游实测为**纯字符串**（如 `"反比例函数与一次函数的交点问题"`），
+    /// 但历史上也存在数组形态，故保留 `Value` 容错。
     pub knowledges: Option<serde_json::Value>,
     pub area: Option<String>,
     pub year: Option<serde_json::Value>,
@@ -1231,6 +1250,80 @@ mod tests {
         assert_eq!(q.question_type.as_deref(), Some("选择题"));
         assert_eq!(q.image_urls.as_ref().map(|v| v.len()), Some(1));
         assert_eq!(q.content_hash.as_deref(), Some("abc"));
+    }
+
+    /// 回归（E10 实测）：`options_html` 可能是**空对象**，整条不能因此失败。
+    ///
+    /// ## 当时的线上症状
+    /// 用户在 App 里搜同类题 → `题庄搜题返回体中第 1 条无法解析（接口可能已变更）`
+    /// → 前端显示「搜题失败」，**但额度已经扣掉了**（后端已消费上游额度）。
+    ///
+    /// ## 根因
+    /// 该字段原先声明为 `Option<String>`，而填空题的上游返回是 `{}`：
+    /// ```json
+    /// {"question_type":"填空题","options":{},"options_html":{}}
+    /// ```
+    /// `{}` 无法解成 String → 单条失败 → 逐条解析的循环**整体 return Err**。
+    ///
+    /// ## 为什么要用真实响应做断言
+    /// 只写「造一个正常选择题」的测试**永远发现不了**这个坑 ——
+    /// 必须复刻填空题那种「空对象」形态。此用例即为该形态的最小复现。
+    #[test]
+    fn parses_fill_blank_question_with_empty_options_object() {
+        // 逐字取自 2026-10-05 的真实响应（/v1/trial/questions，填空题）
+        let raw = serde_json::json!({
+            "id": 706324,
+            "title": "（2016•大邑县模拟）已知双曲线y=…",
+            "title_html": "<img src=\"...\">（2016•大邑县模拟）…",
+            "options": {},
+            "options_html": {},
+            "answer": "1",
+            "answer_html": "【解答】解：…",
+            "analysis": "【分析】先求出A、B两点坐标…",
+            "analysis_html": "【分析】先求出A、B两点坐标…",
+            "question_type": "填空题",
+            "difficulty": 3.0,
+            "subject_id": 2,
+            "grade_id": 8,
+            "knowledges": "反比例函数与一次函数的交点问题",
+            "year": 2016,
+            "area": "",
+            "paper_type": "",
+            "source": "",
+            "is_auto_gradable": false,
+            "has_images": true,
+            "image_urls": ["https://example.com/a.png"],
+            "content_hash": "abc",
+            "subquestions": []
+        });
+        let q: QuestionBankQuestion = serde_json::from_value(raw)
+            .expect("填空题的 options/options_html 是空对象，绝不能导致整条解析失败");
+        assert_eq!(q.id, Some(706324));
+        assert_eq!(q.question_type.as_deref(), Some("填空题"));
+        // options_html 收到的是对象而非字符串 —— 这正是它必须是 Value 的原因
+        assert!(q.options_html.as_ref().is_some_and(|v| v.is_object()));
+        assert!(q.options.as_ref().is_some_and(|v| v.is_object()));
+        // difficulty 上游是 float，字段是 Value，应能收下
+        assert!(q.difficulty.is_some());
+        // knowledges 上游是**字符串**，不是数组
+        assert!(q.knowledges.as_ref().is_some_and(|v| v.is_string()));
+    }
+
+    /// 回归：选择题的 `options_html` 是**对象**（键为选项名），同样要能收。
+    ///
+    /// 与上一条合起来锁死「该字段类型随题型变化」这一事实 ——
+    /// 任何把它当成固定类型的写法都会在这里失败。
+    #[test]
+    fn parses_choice_question_with_object_options_html() {
+        let raw = serde_json::json!({
+            "id": 1,
+            "question_type": "选择题",
+            "options": {"A": "1", "B": "2"},
+            "options_html": {"A": "<p>1</p>", "B": "<p>2</p>"},
+        });
+        let q: QuestionBankQuestion = serde_json::from_value(raw)
+            .expect("选择题的 options_html 是对象，必须能解析");
+        assert!(q.options_html.as_ref().is_some_and(|v| v.is_object()));
     }
 
     /// 回归：序列化给前端时必须是 **camelCase**（前端读 `billedCount` 等）。

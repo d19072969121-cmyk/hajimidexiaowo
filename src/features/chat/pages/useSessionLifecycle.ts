@@ -26,13 +26,24 @@ const emitSessionListUpdated = () => {
 };
 
 const requestChatInputFocus = (sessionId: string) => {
+  // 防御：单测（node 环境）与任何非浏览器上下文里没有 window。
+  // 这里只是「顺手聚焦输入框」的增强，拿不到 window 时静默跳过即可 ——
+  // 不加这层守卫会留下一个 120ms 的 timer，在测试环境 teardown 后触发
+  // `ReferenceError: window is not defined`，污染整轮测试结果。
+  if (typeof window === 'undefined') return;
+
   const emitFocus = () => {
+    // 回调可能晚于环境销毁（测试 teardown / 页面卸载）才执行，
+    // 故在**回调内部**再查一次，而不是只在外层判断。
+    if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('CHAT_V2_FOCUS_INPUT', {
       detail: { sessionId },
     }));
   };
 
-  requestAnimationFrame(emitFocus);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(emitFocus);
+  }
   window.setTimeout(emitFocus, 120);
 };
 
@@ -142,48 +153,46 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
   }, [currentSessionId]);
 
   // 创建新会话（使用全局科目）- 提前定义用于 useMobileHeader
-  const createSession = useCallback(async (groupId?: string) => {
+  /**
+   * 新建会话。
+   *
+   * ## `opts.forceNew`（E10，修用户反馈 ⑥）
+   * 「+新对话」按钮走 **forceNew: true**，真正建一个全新会话。
+   *
+   * ### 为什么必须这样
+   * 下面那段 `currentDraftScope === targetDraftScope` 的判等，本意是避免
+   * 「已经在草稿会话里却又建一个空会话」的重复创建。但 App 启动时会
+   * **自动建一个隐藏草稿会话**，于是用户点「+新对话」时 scope 往往已经相同
+   * → 直接 return → **界面上什么都没发生**，用户只能判断成「按钮坏了」。
+   *
+   * ### E9 的修法为什么没解决问题
+   * E9 改成「聚焦输入框 + 有内容才提示」。但草稿本来就空、输入框本来就
+   * 已在焦点上 —— **聚焦不产生任何视觉变化**。这个修法猜的是
+   * 「用户想开始输入」，而用户的实际意图是「给我一个新的空会话」。
+   *
+   * ### 现在的语义
+   * - 用户点「+新对话」→ **一定**拿到一个新会话（forceNew）
+   * - 内部幂等调用（启动恢复等）→ 不传 forceNew，保留复用草稿的行为
+   */
+  const createSession = useCallback(async (groupId?: string, opts?: { forceNew?: boolean }) => {
     const currentDraftScope = getCurrentHiddenDraftSessionScope();
     const targetDraftScope = getDraftSessionScope('chat', groupId ?? null);
-    if (currentDraftScope === targetDraftScope) {
-      // ⚠️ E9（用户反馈 ⑥「首页 +新对话 点了没反应」）：
-      //     App 启动时会**自动建一个隐藏草稿会话**，所以用户点「+新对话」时
-      //     scope 往往已经相同 —— 原实现直接 return，**界面上什么都没发生**，
-      //     用户只能理解成「按钮坏了」。
-      //
-      //     正确语义：此时用户想要的不是「再建一个会话」（草稿会话本来就是空的、
-      //     复用的），而是「让我开始输入新一轮」。故改为：
-      //       ① 聚焦输入框（有可见反馈）
-      //       ② 仅当当前草稿**已有内容或消息**时才提示，避免每次点击都弹通知
-      //          （空草稿是无感的，反复弹通知反而吵）。
+    if (!opts?.forceNew && currentDraftScope === targetDraftScope) {
+      // 保留：仅用于**内部**幂等调用（复用现有草稿，不重复建会话）。
+      // 「+新对话」按钮不会走到这里 —— 它传 forceNew。
       const draftId = currentSessionId;
       if (draftId) {
         requestChatInputFocus(draftId);
-        const store = sessionManager.get(draftId);
-        // 字段名以 `core/types/store.ts` 的 ChatStore 为准：
-        //   消息是 `messageMap` + `messageOrder`（**没有** `messages` 这个字段）
-        //
-        // ⚠️ 防御式读取：`sessionManager.get` 在测试/半初始化态下可能返回
-        //    尚未填充 messageOrder 的 store（实测单测里就是 undefined）。
-        //    「有没有内容」只是决定要不要弹提示，读不到就当没有 —— 不能因此抛错。
-        const hasContent = (() => {
-          if (!store) return false;
-          const order = store.getState()?.messageOrder;
-          return Array.isArray(order) && order.length > 0;
-        })();
-        if (hasContent) {
-          showGlobalNotification(
-            'info',
-            t('page.newSessionAlreadyReady', '已在新对话中，请直接输入'),
-          );
-        }
       }
       return;
     }
 
     setIsLoading(true);
     try {
-      const session = await getOrCreateHiddenDraftSession(groupId);
+      // forceNew：不复用已存的草稿 id，直接建一个新的
+      const session = opts?.forceNew
+        ? await createHiddenDraftSession(groupId ?? null)
+        : await getOrCreateHiddenDraftSession(groupId);
       setCurrentSessionId(session.id);
       requestChatInputFocus(session.id);
     } catch (error) {
@@ -192,7 +201,7 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
     } finally {
       setIsLoading(false);
     }
-  }, [getCurrentHiddenDraftSessionScope, getOrCreateHiddenDraftSession, setCurrentSessionId, setIsLoading, t, currentSessionId]);
+  }, [getCurrentHiddenDraftSessionScope, getOrCreateHiddenDraftSession, createHiddenDraftSession, setCurrentSessionId, setIsLoading, t, currentSessionId]);
 
   // P1-06: 创建分析模式会话
   // 打开文件对话框让用户选择图片，然后创建 analysis 模式会话

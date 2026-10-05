@@ -36,7 +36,11 @@ export interface UseChatPageEventsDeps {
   loadSessions: () => Promise<void>;
   isInitialLoading: boolean;
   currentSessionId: string | null;
-  createSession: (groupId?: string) => Promise<void>;
+  createSession: (
+    groupId?: string,
+    /** forceNew：「+新对话」按钮用。见 useSessionLifecycle 里的说明。 */
+    opts?: { forceNew?: boolean },
+  ) => Promise<void>;
   createAnalysisSession: () => Promise<void>;
   setSessions: React.Dispatch<React.SetStateAction<ChatSession[]>>;
   setCurrentSessionId: (id: string | null | ((prev: string | null) => string | null)) => void;

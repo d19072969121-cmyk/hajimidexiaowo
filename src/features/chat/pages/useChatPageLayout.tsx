@@ -33,7 +33,11 @@ export interface UseChatPageLayoutDeps {
   sessionSheetOpen: boolean;
   t: TFunction<any, any>;
   sessionCount: number;
-  createSession: (groupId?: string) => Promise<void>;
+  createSession: (
+    groupId?: string,
+    /** forceNew：「+新对话」按钮用。见 useSessionLifecycle 里的说明。 */
+    opts?: { forceNew?: boolean },
+  ) => Promise<void>;
   isLoading: boolean;
   mobileResourcePanelOpen: boolean;
   finderBreadcrumbs: BreadcrumbItem[];
@@ -109,7 +113,10 @@ export function useChatPageLayout(deps: UseChatPageLayoutDeps) {
       variant="ghost"
       size="icon"
       iconOnly
-      onClick={() => void createSession()}
+      // ⚠️ forceNew（E10）：这是**首页右上角的「+」**，用户反馈「点了没反应」
+      //    就是它。不传 forceNew 时会被隐藏草稿会话的 scope 判等挡住，
+      //    函数直接 return —— 界面零变化。
+      onClick={() => void createSession(undefined, { forceNew: true })}
       disabled={isLoading}
       className={shellIconButtonClassName}
       data-mobile-floating-menu-button
@@ -125,7 +132,8 @@ export function useChatPageLayout(deps: UseChatPageLayoutDeps) {
       variant="ghost"
       size="icon"
       iconOnly
-      onClick={() => void createSession()}
+      // forceNew（E10）：会话内右上角的「+」，语义同样是「开一个新会话」
+      onClick={() => void createSession(undefined, { forceNew: true })}
       disabled={isLoading || isEmptyNewChat}
       className={shellIconButtonClassName}
       aria-label={t('page.newSession')}
@@ -142,7 +150,7 @@ export function useChatPageLayout(deps: UseChatPageLayoutDeps) {
       iconOnly
       onClick={() => {
         setViewMode('sidebar');
-        void createSession();
+        void createSession(undefined, { forceNew: true });
       }}
       disabled={isLoading}
       aria-label={t('page.newSession')}

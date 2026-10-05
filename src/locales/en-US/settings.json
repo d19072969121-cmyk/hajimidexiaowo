@@ -388,7 +388,10 @@
         "field_label": "Model adapter",
         "helper": "Adapters automatically preload known capabilities and defaults."
       },
-      "enable_label": "Enable this configuration"
+      "enable_label": "Enable this configuration",
+      "override_connection": "Custom endpoint",
+      "override_connection_hint": "Follows the vendor by default. Enable to give this model its own endpoint and key — useful for self-hosted relays or any OpenAI-compatible service.",
+      "current_connection": "Current"
     }
   },
   "vendor_panel": {

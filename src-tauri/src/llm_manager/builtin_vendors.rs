@@ -225,6 +225,38 @@ pub const BUILTIN_VENDORS: &[BuiltinVendor] = &[
         max_tokens_limit: None,
         website_url: "https://platform.xiaomimimo.com",
     },
+    // Pollinations —— 免 Key 通道（E10 新增）
+    //
+    // ## 为什么要内置一个「不需要 Key」的源
+    // 其余内置源都需要用户自行申请 API Key。未成年用户无法完成实名注册，
+    // 于是「内置免费」实际用不了（模型列表拉不到、聊天直接报错）。
+    // Pollinations 提供 OpenAI 兼容的匿名通道，**无需任何 Key 即可调用**，
+    // 是当前唯一能把「开箱即用」真正落地的方式。
+    //
+    // ## auth_mode = "none" 的含义（后端已完整支持，不是新机制）
+    // - 允许 api_key 为空（`mod.rs` 的 AUTH_MODE_NONE 分支会跳过密钥校验）
+    // - 允许在凭据被掩码的情况下修改 base_url 主机/协议/端口
+    //   （否则会被 "修改供应商地址...必须重新输入 API 密钥" 拦下）
+    // 若不设该值，用户填一个假 key 才能保存，语义混乱且改地址会被拒。
+    //
+    // ## 实测（2026-10-05）
+    //   POST https://text.pollinations.ai/openai  {"model":"openai",...}
+    //   → 200，返回标准 chat.completion 结构，user_tier=anonymous
+    //   GET  https://text.pollinations.ai/models → 列表含 reasoning/tools 能力位
+    //
+    // ## 已知限制（写进 notes，让用户看得见而不是踩坑）
+    // - 匿名通道有频率限制，高峰期可能 429
+    // - 服务商可能调整可用模型，故同时给出「自定义」兜底路径
+    BuiltinVendor {
+        id: "builtin-pollinations",
+        name: "Pollinations（免 Key）",
+        provider_type: "pollinations",
+        auth_mode: Some(super::AUTH_MODE_NONE),
+        base_url: "https://text.pollinations.ai/openai",
+        notes: "免 API Key 的匿名通道，开箱即用（无需注册）。基于 GPT-OSS 20B，支持工具调用与推理。匿名通道有频率限制，高峰期可能返回 429；如需更稳定的服务，可在「自定义」里填入任何 OpenAI 兼容接口。",
+        max_tokens_limit: None,
+        website_url: "https://pollinations.ai",
+    },
 ];
 
 /// 所有内置模型列表
@@ -1025,6 +1057,25 @@ pub const BUILTIN_MODELS: &[BuiltinModel] = &[
         is_reasoning: true,
         supports_tools: true,
         max_output_tokens: 131072,
+        temperature: 1.0,
+    },
+    // ===== Pollinations 免 Key 模型（E10 新增）=====
+    //
+    // `model` 字段取值必须与上游 `/models` 的 name/aliases 一致。
+    // 实测（2026-10-05）该端点只有一个模型条目：
+    //   name=openai-fast, aliases=[openai, gpt-oss, gpt-oss-20b, ovh-reasoning]
+    // 这里用最稳定的别名 `openai`（上游换底层模型时别名不受影响）。
+    //
+    // `temperature` 取 1.0：该后端是推理模型，采样参数偏离默认值易触发上游 400。
+    BuiltinModel {
+        id: "builtin-pollinations-openai",
+        vendor_id: "builtin-pollinations",
+        label: "Pollinations 免Key通道",
+        model: "openai",
+        is_multimodal: false,
+        is_reasoning: true,
+        supports_tools: true,
+        max_output_tokens: 32768,
         temperature: 1.0,
     },
 ];

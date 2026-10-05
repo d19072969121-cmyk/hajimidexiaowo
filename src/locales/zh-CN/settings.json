@@ -388,7 +388,10 @@
         "field_label": "模型适配器",
         "helper": "适配器将自动匹配成功能支持与默认参数。"
       },
-      "enable_label": "启用此配置"
+      "enable_label": "启用此配置",
+      "override_connection": "自定义接口地址",
+      "override_connection_hint": "默认跟随所属供应商。勾选后可为本模型单独指定接口地址与密钥 —— 适用于接入自建中转或其它 OpenAI 兼容服务。",
+      "current_connection": "当前"
     }
   },
   "vendor_panel": {
