@@ -3121,6 +3121,7 @@
     "clear": "Clear config",
     "clearConfirm": "You'll need to re-enter credentials. Continue?",
     "clearOk": "Clear",
-    "clearCancel": "Cancel"
+    "clearCancel": "Cancel",
+    "apply": "Apply"
   }
 }

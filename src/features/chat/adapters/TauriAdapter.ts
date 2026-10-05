@@ -16,6 +16,8 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import i18n from 'i18next';
 import { formatUserFacingErrorWithThinkingBudgetHint, getErrorMessage } from '@/utils/errorUtils';
 import { showGlobalNotification } from '@/components/UnifiedNotification';
+// 解析类模式判据（单一路径，勿改回 `mode === 'analysis'` 字面量）
+import { isAnalysisFamilyMode } from '../plugins/modes/modeFamily';
 import {
   clearAdapterErrorFlag,
   reportAdapterError,
@@ -1073,6 +1075,32 @@ export class ChatV2TauriAdapter {
             } catch (initError) {
               console.error(LOG_PREFIX, `Failed to init mode '${mode}':`, getErrorMessage(initError));
             }
+          }
+        } else if (meta?.mode && meta.mode !== 'chat') {
+          // ⚠️ E10：**重启 App 后重开既有会话**的分支（此前完全缺失）。
+          //
+          // ## 缺这个分支的后果（用户报「退出软件就没了，回来图片解析啥的都没了」）
+          // `pendingInitConfig` 只活在内存里（`sessionManager` 的 meta），
+          // 且用完即删（`clearPendingInitConfig`）。重启 App 后它必然是 undefined，
+          // 于是这条 if/else 链**两个分支都不命中** →
+          // 模式专属状态（`modeState`：images / ocrMeta / note）根本不会被初始化，
+          // 解析类会话重开后只剩一个空壳，图片与 OCR 结果"消失"。
+          //
+          // ## 为什么这里可以安全地调 initSession
+          // `initSession(mode)` 不带 initConfig，只做**默认状态初始化**；
+          // 真正的图片恢复由 `restoreAnalysisImages` 从 VFS 引用读回
+          // （图片本就已持久化在 VFS attachments 表里，见 uploadAttachment）。
+          console.log(LOG_PREFIX, `Restoring mode '${meta.mode}' for existing session`);
+          try {
+            await this.store.initSession(meta.mode);
+            await this.restorePersistedModeMedia(meta.mode);
+          } catch (restoreError) {
+            // 恢复失败不能阻断会话打开 —— 用户至少还能继续对话
+            console.warn(
+              LOG_PREFIX,
+              `Failed to restore mode '${meta.mode}':`,
+              getErrorMessage(restoreError),
+            );
           }
         }
       }
@@ -5301,6 +5329,67 @@ export class ChatV2TauriAdapter {
       chatParams.maxTokens,
       undefined
     );
+  }
+
+  /**
+   * 恢复**已持久化的模式媒体**（E10）。
+   *
+   * ## 用户症状
+   * 「错题本是临时的，退出软件就没了，回来图片解析啥的都没了」
+   *
+   * ## 为什么此前会丢
+   * 拍题时图片被上传到 VFS（`uploadAttachment` → `vfs_upload_attachment`），
+   * **数据本身是持久化的**；但前端把图片另存了一份在内存的
+   * `modeState.images` 里（供解析页直接渲染）。
+   * 重启 App 后 `modeState` 从后端快照恢复 —— 而快照只在**发过消息**时
+   * 才会带上完整 modeState。没发消息就退出的会话，images 就是空的。
+   *
+   * ## 恢复来源（两路，按可靠性排序）
+   * 1. **消息附件**：`msg.attachments[].previewUrl` 就是 `data:image/...;base64,...`
+   *    的完整内容，且随历史消息一起从后端返回 —— 最可靠。
+   * 2. VFS 引用：附件同时以 `sourceId` 存于 VFS attachments 表，
+   *    需要额外 IPC 读取（当前先不做，附件路径已覆盖绝大多数场景）。
+   *
+   * ## 只补不改
+   * 仅当 `modeState.images` **为空**时才回填 —— 已经渲染中的会话不能被覆盖
+   * （否则会在用户眼前闪一下）。
+   */
+  private async restorePersistedModeMedia(mode: string): Promise<void> {
+    if (!isAnalysisFamilyMode(mode)) return;
+
+    const state = this.getCurrentState() as unknown as {
+      modeState?: { images?: unknown } | null;
+      messageMap?: Map<string, { attachments?: Array<{ type?: string; previewUrl?: string }> }>;
+      messageOrder?: string[];
+    };
+
+    const existing = state.modeState?.images;
+    if (Array.isArray(existing) && existing.length > 0) return;
+
+    const messageMap = state.messageMap;
+    const messageOrder = state.messageOrder;
+    if (!messageMap || !messageOrder) return;
+
+    // 取回本会话所有消息里的图片附件（按时间顺序，与拍题顺序一致）
+    const images: string[] = [];
+    for (const messageId of messageOrder) {
+      const message = messageMap.get(messageId);
+      if (!message?.attachments?.length) continue;
+      for (const attachment of message.attachments) {
+        if (attachment?.type !== 'image') continue;
+        const url = attachment.previewUrl;
+        // 只收 data URL：blob:/file: 等临时引用在重启后必然失效，
+        // 收进来只会渲染成破图，不如不收。
+        if (typeof url === 'string' && url.startsWith('data:')) {
+          images.push(url);
+        }
+      }
+    }
+
+    if (images.length === 0) return;
+
+    this.store.updateModeState({ images });
+    console.log(LOG_PREFIX, `Restored ${images.length} persisted image(s) for mode '${mode}'`);
   }
 
   private notifyContextTruncated(removedCount: number): void {

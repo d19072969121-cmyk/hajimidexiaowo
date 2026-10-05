@@ -3121,6 +3121,7 @@
     "clear": "清除配置",
     "clearConfirm": "清除后需重新填写凭据，确定？",
     "clearOk": "确定清除",
-    "clearCancel": "取消"
+    "clearCancel": "取消",
+    "apply": "去申请"
   }
 }

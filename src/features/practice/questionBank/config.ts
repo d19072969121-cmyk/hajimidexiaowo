@@ -67,6 +67,18 @@ export interface QuestionBankField {
    * 且容易填错。预填后用户只需在需要升级额度时补 License。
    */
   defaultValue?: string;
+  /**
+   * 字段旁的「去申请 / 去获取」跳转地址（E10）。
+   *
+   * ## 为什么做成字段级而不是来源级
+   * 用户要的是「在『200 题/日』旁边加个『去申请』」—— 那个位置**就是这个字段的
+   * hint**。放在来源级只能显示在卡片标题旁，跟具体文案对不上，用户找不到。
+   *
+   * 渲染：hint 那一行右侧追加一个带外链图标的按钮。
+   */
+  actionUrl?: string;
+  /** 上面那个跳转按钮的文案（不填则默认「去申请」） */
+  actionLabel?: string;
 }
 
 /**
@@ -123,6 +135,9 @@ export const QUESTION_BANK_PROVIDERS: readonly QuestionBankProviderMeta[] = [
         secret: true,
         placeholder: '留空则使用匿名试用',
         hint: '留空时自动启用 24 小时匿名试用（100 题）。到官网免费注册可获得 200 题/日',
+        // 用户要求：「在题庄那一栏『200 题/日』旁边加个『去申请』按钮，点击跳转题庄主页」
+        actionUrl: 'https://tizhuang.qcscience.cc/account?mode=register',
+        actionLabel: '去申请',
       },
     ],
   },

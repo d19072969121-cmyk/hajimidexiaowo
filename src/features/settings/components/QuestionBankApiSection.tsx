@@ -287,8 +287,28 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
                     onChange={(e) => setCredential(activeMeta.id, field.key, e.target.value)}
                     className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:border-primary"
                   />
-                  {field.hint && (
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{field.hint}</span>
+                  {(field.hint || field.actionUrl) && (
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                      {field.hint && <span>{field.hint}</span>}
+                      {/*
+                        「去申请」入口（E10，用户要求）：
+                        紧跟在 hint 文案（含「200 题/日」）后面，位置就是用户说的那一处。
+                        ⚠️ 用 <a> 而不是 DsButton —— 这是跳外部网页，不是应用内动作；
+                           且 <a> 天然支持长按「在新标签打开」，移动端体验更顺。
+                      */}
+                      {field.actionUrl && (
+                        <a
+                          href={field.actionUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          data-testid={`question-bank-action-${field.key}`}
+                          className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-primary/40 px-2 py-0.5 text-primary active:bg-primary/10"
+                        >
+                          {field.actionLabel || t('settings:questionBank.apply', '去申请')}
+                          <ExternalLink size={11} aria-hidden="true" />
+                        </a>
+                      )}
+                    </span>
                   )}
                 </label>
               ))}
