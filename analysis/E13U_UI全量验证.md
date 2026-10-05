@@ -175,26 +175,55 @@ src/locales/en-US/settings.json:1262-1264,1279
 
 ---
 
-## 3. 实跑结果
+## 3. 实跑结果（✅ 已完成 —— E13U 补跑轮）
 
-> ⚠️ **本节状态：部分完成。** 执行期间 Lead 两次下达 vitest 静默窗口（保护 perf-profiler 的 task-10 性能基准）。
-> 已完成的实跑与未完成项分别记录如下。
+> 2026-10-05 由 UI 测试工程师（E13U 补跑轮）按「串行 + `--pool=forks --poolOptions.forks.maxForks=1` + 每条命令限时 2 分钟（超时转后台 job）」纪律全部补跑完成。
+> 环境：Android 手机容器（8 核 / 11GB，`/proc` 按 PID 命名空间隔离）。全程 `MemAvailable` 最低约 3.2GB，未再触发 OOM。
 
-### 3.1 已完成实跑
+### 3.0 验证矩阵总览（本轮最终结果）
 
-| 套件 | 命令 | 结果 |
-|---|---|---|
-| `tests/vitest/mobile-uiux/`（15 文件） | `npx vitest run tests/vitest/mobile-uiux --reporter=dot` | ✅ **14 passed / 189 tests passed**，耗时 67.4s |
+| # | 套件 | 文件 | 用例 | 结果 | Duration | 执行 |
+|---|---|---|---|---|---|---|
+| 1 | `tests/vitest/mobile-uiux/` | 14 | 189 | ✅ 全过 | 67.4s | 历史（task-15） |
+| 2 | `tests/vitest/settings/` | 18 | 52 | ✅ 全过 | 245.22s | 本轮实跑 |
+| 3 | `src/features/settings/components/__tests__/` | 47 | 407 | ⚠️ 2 failed / 405 passed（1 文件失败 / 46 过） | 867.80s | 本轮实跑 |
+| 4 | `tests/vitest/icons/` + `tests/vitest/mobile-uiux/tabBarIconContract.source.test.ts` | 2 | 47 | ✅ 全过 | 22.66s | 本轮实跑 |
 
-### 3.2 未能完成实跑（静默窗口）
+合计（去重后）：**81 个测试文件 / 695 个用例：692 过 / 2 失败 / （mobile-uiux 189 内无失败）**。
+失败集中在唯一文件 `VendorDetailPanel.responsiveEditor.test.tsx`（原始错误信息见 3.4）。
 
-| 套件 | 状态 | 原因 |
-|---|---|---|
-| `tests/vitest/settings/`（18 文件） | ⏸️ 未完成 | 静默窗口；且并发跑 3 个 vitest 时触发 Node 崩溃（见 3.3） |
-| `src/features/settings/components/__tests__/`（46 文件） | ⏸️ 未完成 | 同上 |
-| `src/components/**/__tests__/`（83 文件） | ⏸️ 未完成 | 同上 |
+### 3.1 已完成实跑（原始输出摘录）
 
-### 3.3 实跑中暴露的环境问题（非测试失败，已取证）
+```
+[第1套] npx vitest run tests/vitest/settings/ --pool=forks --poolOptions.forks.maxForks=1 --reporter=dot
+ Test Files  18 passed (18)
+      Tests  52 passed (52)
+   Duration  245.22s (transform 25.76s, setup 40.37s, collect 77.63s, tests 1.02s, environment 106.11s, prepare 7.50s)
+ EXIT=0
+
+[第3套] npx vitest run tests/vitest/icons/ tests/vitest/mobile-uiux/tabBarIconContract.source.test.ts --pool=forks --poolOptions.forks.maxForks=1 --reporter=dot
+ Test Files  2 passed (2)
+      Tests  47 passed (47)
+   Duration  22.66s (transform 392ms, setup 4.95s, collect 284ms, tests 545ms, environment 13.78s, prepare 1.32s)
+ EXIT=0
+```
+
+第 2 套 dot 首跑时 tinypool 在收尾阶段抛 Unhandled Rejection（见 3.5），汇总行被吞；
+换 default reporter 重跑拿到完整统计（3.2），且两次独立运行失败数一致（均 2），结果可信。
+
+### 3.2 第 2 套完整统计（default reporter 重跑）
+
+```
+ Test Files  1 failed | 46 passed (47)
+      Tests  2 failed | 405 passed (407)
+   Duration  867.80s (transform 50.99s, setup 121.00s, collect 332.93s, tests 19.80s, environment 324.36s, prepare 29.32s)
+ EXIT=1
+```
+
+> Duration 明显偏大是环境因素：容器内多会话并行（perf-profiler 会话同时在跑 `vitest list`）、
+> setup+environment 累计约 445s。测试本体（tests 项）仅 19.80s。
+
+### 3.3 历史崩溃归档（3 套补跑前的并发事故，保留备查）
 
 并发运行 3 个 vitest 作业（settings / settings-components / src-components）时，进程崩溃：
 
@@ -217,9 +246,66 @@ Node.js v24.19.0
 
 **判定：这是 Node 24 + forks 池的环境级崩溃，不是断言失败。**
 机器状态：8 核 / 11GB 物理内存，并发时 `MemAvailable` 只剩 **3.1GB**，且残留 vitest worker 占用 7.9GB。
+本轮实测：串行 + maxForks=1 全程稳定，无 OOM 复现。
 
-**复现与规避已实测：** 串行 + `--pool=forks --poolOptions.forks.maxForks=1` 时，
-settings 套件可正常启动（已跑到 dot 输出 16 个点后被 `timeout 115` 主动截断，非崩溃）。
+### 3.4 失败项明细（仅记录，未修代码 —— 按任务纪律）
+
+**文件：`src/features/settings/components/__tests__/VendorDetailPanel.responsiveEditor.test.tsx`**（同一文件 2 例）
+
+**失败 1**：`VendorDetailPanel responsive model editor > floats an active inline edit below xl without losing unsaved form state`
+
+```
+Error: expect(element).toHaveClass("max-w-[672px]")
+
+Expected the element to have class:
+  max-w-[672px]
+Received:
+  relative z-modal min-h-0 w-full overflow-hidden border-border/60 bg-background shadow-2xl
+  [&]:rounded-t-[24px] max-h-[92dvh] h-auto sm:h-[min(760px,calc(100dvh-4rem))] sm:max-h-none
+  sm:max-w-[672px] sm:rounded-lg sm:border
+ ❯ VendorDetailPanel.responsiveEditor.test.tsx:203:88
+    201|     expect(editorShell).toHaveClass('fixed');
+    202|     expect(editorShell.parentElement?.parentElement).toBe(document.bod…
+    203|     expect(screen.getByTestId(`responsive-inline-model-editor-surf…
+        |                                                                                        ^
+    204|     expect(screen.getByLabelText('common:api_config_modal.config_name'…
+    205|     expect(callbacks.handleOpenModelEditor).not.toHaveBeenCalled();
+```
+
+**失败 2**：`VendorDetailPanel responsive model editor > floats an active inline new-model form below xl without remounting it`
+
+```
+Error: expect(element).toHaveClass("max-w-[672px]")
+
+Expected the element to have class:
+  max-w-[672px]
+Received:
+  relative z-modal min-h-0 w-full overflow-hidden border-border/60 bg-background shadow-2xl
+  [&]:rounded-t-[24px] max-h-[92dvh] h-auto sm:h-[min(760px,calc(100dvh-4rem))] sm:max-h-none
+  sm:max-w-[672px] sm:rounded-lg sm:border
+ ❯ VendorDetailPanel.responsiveEditor.test.tsx:227:78
+    225|     expect(editorShell).toHaveClass('fixed');
+    226|     expect(editorShell.parentElement?.parentElement).toBe(document.bod…
+    227|     expect(screen.getByTestId('responsive-inline-new-model-editor-surf…
+        |                                                                              ^
+    228|     expect(screen.getByLabelText('common:api_config_modal.config_name'…
+    229|     expect(callbacks.handleOpenModelEditor).not.toHaveBeenCalled();
+```
+
+**初步归因（供后续修复参考，本轮未动代码）**：测试断言行内编辑浮层在 xl 以下应带裸类
+`max-w-[672px]`；组件实现给的是 `sm:max-w-[672px]`（无裸类）。是「测试期望 ↔ 实现」的
+类名契约不匹配，非环境/并发问题（dot 首跑与 default 重跑两轮独立运行均稳定复现这 2 例）。
+涉及 E13U 原报告第 2 节改动 5（VendorDetailPanel）的关联测试。
+
+### 3.5 补跑期间的环境插曲（非测试失败）
+
+1. **dot 首跑收尾崩溃**：第 2 套 dot reporter 首跑 407 用例打完（2 个 `x`）后，tinypool 抛
+   `Unhandled Rejection: Error: Channel closed` + `Serialized Error: { code: 'ERR_IPC_CHANNEL_CLOSED' }`
+   （`ProcessWorker.send node_modules/tinypool/dist/index.js:140`），Summary 行未输出，EXIT=1。
+   属 worker 收尾竞态；default 重跑全量完成，失败数与 dot 首跑一致（2），已采信重跑结果。
+2. **多会话资源竞争**：本机同批还有其他工程师会话的 job 在跑（观测到 `npx vitest list`、
+   `cargo` 等进程），期间本会话后台 job 两次被外部 SIGTERM。等待其窗口结束后重启即过，
+   未影响最终结果采集。串行 maxForks=1 纪律下全程 `MemAvailable ≥ 3.2GB`，无 OOM。
 
 ---
 
@@ -251,23 +337,31 @@ settings 套件可正常启动（已跑到 dot 输出 16 个点后被 `timeout 1
 | UI 区域 | 测试套件 | 状态 | 风险 |
 |---|---|---|---|
 | 移动端底栏 Tab 栏 | `mobileTabBar` / `a3TabBarRender` / `a3WiringContract` | ✅ 实跑覆盖 | 🟡 图标契约无断言 |
+| 移动端底栏图标契约 | `tests/vitest/icons/` + `tabBarIconContract.source.test.ts` | ✅ **47 tests passed**（22.66s） | 🟢 |
 | 移动端顶栏（三杠） | `useMotionPresence.race`（新增 8 例） | ✅ 修复 + 覆盖 | 🟢 |
 | 移动端顶栏遮罩 | `e13MobileSidebarMaskOpacity` | ✅ 实跑覆盖 | 🟢 |
 | 输入栏 / IME | `ComposerTextarea.imeComposition` | ✅ 覆盖 | 🟢 |
-| 移动端 UI/UX 契约 | `tests/vitest/mobile-uiux/` 14 文件 | ✅ **189 tests passed** | 🟢 |
-| 设置 - 供应商面板 | `VendorDetailPanel.autoFetchModels` 等 | ✅ 覆盖 | 🟢 |
-| 设置 - 关于页 | `OpenSourceAcknowledgementsSection` / `aboutLinksActionRow` | ⏸️ 未实跑 | 🟡 |
-| 设置 - 全套 | `tests/vitest/settings/` 18 文件 | ⏸️ 未实跑 | 🟡 |
-| 设置 - 组件 | `src/features/settings/components/__tests__/` 46 文件 | ⏸️ 未实跑 | 🟡 |
-| 通用组件 | `src/components/**/__tests__/` 83 文件 | ⏸️ 未实跑 | 🟡 |
+| 移动端 UI/UX 契约 | `tests/vitest/mobile-uiux/` 14 文件 | ✅ **189 tests passed**（67.4s，历史） | 🟢 |
+| 设置 - 供应商面板 | `VendorDetailPanel.autoFetchModels` 等 | ✅ 覆盖（11 例过） | 🟢 |
+| 设置 - 关于页 | `OpenSourceAcknowledgementsSection` / `aboutLinksActionRow` | ✅ **实跑通过**（随 settings 全套） | 🟢 |
+| 设置 - 全套 | `tests/vitest/settings/` 18 文件 | ✅ **52 tests passed**（245.22s） | 🟢 |
+| 设置 - 组件 | `src/features/settings/components/__tests__/` 47 文件 | ⚠️ **405/407 passed，2 failed**（responsiveEditor，见 3.4） | 🟡 |
+| 通用组件 | `src/components/**/__tests__/` 83 文件 | ⏸️ 仍未实跑（不在本轮任务范围） | 🟡 |
 | 应用图标 | `src-tauri/icons/**` 52 文件 | ❌ **无测试** | 🔴 |
-| locale 文案 | 分散 i18n 契约 | ⏸️ 未实跑 | 🟡 |
+| locale 文案 | 分散 i18n 契约（已随上述套件部分覆盖） | 🟡 专项实跑未做 | 🟡 |
 
 ---
 
 ## 6. 遗留与后续
 
-1. **待办**：静默窗口结束后补跑 settings（18）+ settings components（46）+ src components（83），
-   按「串行 + maxForks=1 + 每条命令 timeout 115」执行，避免再次触发 Node 崩溃。
-2. **待确认**：`settingsMobileDataListsContract.test.ts` 实际用例数（静态计数为 0，需实跑确认非空跑）。
-3. **本报告已确认无需修复的三项**：图标唯一性、相机 path 合法性、locale 上游署名 —— 均为正常状态，勿误改。
+1. ✅ ~~静默窗口结束后补跑 settings（18）+ settings components（46）~~ **E13U 补跑轮已完成**
+   （2026-10-05，串行 + maxForks=1，结果见 3.0/3.2）。`src/components/**/__tests__/`（83 文件）仍未跑，留待下一轮。
+2. ✅ ~~`settingsMobileDataListsContract.test.ts` 实际用例数~~ **已闭环**：单独实跑 **7 passed**，
+   非空跑（循环生成的用例正常注册）。
+3. 本报告已确认无需修复的三项：图标唯一性、相机 path 合法性、locale 上游署名 —— 均为正常状态，勿误改。
+4. 🔧 **新遗留**：`VendorDetailPanel.responsiveEditor.test.tsx` 2 例失败（3.4），断言期望裸类
+   `max-w-[672px]` 而实现为 `sm:max-w-[672px]`。需决定对齐方向（改测试断言或改实现），
+   本轮按纪律只记录未修。
+5. ⚠️ 环境提醒：本机为多会话共享容器（11GB），跑 vitest 必须坚持
+   `--pool=forks --poolOptions.forks.maxForks=1` 且一次只跑一个 vitest 进程；
+   dot reporter 存在收尾 `ERR_IPC_CHANNEL_CLOSED` 吞 Summary 的风险，需要精确统计时用 default reporter。
