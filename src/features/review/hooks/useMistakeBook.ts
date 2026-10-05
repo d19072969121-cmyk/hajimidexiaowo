@@ -57,6 +57,15 @@ export interface MistakeBookEntry {
   createdAt: string;
   /** 会话简介（自动生成），作为列表副标题 */
   description?: string;
+  /**
+   * 会话扩展元数据（E13-S）。
+   *
+   * 备注存在这里（`metadata.mistakeNote`，见 `useMistakeNote`）。带上它是为了
+   * 让列表能直接渲染备注、并让「编辑备注」拿到**完整的**现有 metadata ——
+   * 后端 `update_session_settings` 对 metadata 是整块替换，只回写备注会
+   * 抹掉其它键（`availableSkillsSnapshot` 等）。
+   */
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -111,6 +120,7 @@ export function toMistakeEntries(sessions: readonly ChatSession[]): MistakeBookE
       updatedAt: s.updatedAt ?? '',
       createdAt: s.createdAt ?? '',
       ...(s.description ? { description: s.description } : {}),
+      ...(s.metadata ? { metadata: s.metadata as Record<string, unknown> } : {}),
     });
   }
 

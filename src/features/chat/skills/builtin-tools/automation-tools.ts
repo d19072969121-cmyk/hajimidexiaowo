@@ -20,7 +20,7 @@ export const automationToolsSkill: SkillDefinition = {
   description:
     '定时自动化：创建、查看、完整修改、启停、立即运行、查询历史、重试、取消或删除每日/工作日/每周/每月/间隔/单次（once）调度。notify 类型到点=系统通知+待办；agent_turn 类型到点由后端 headless 跑完整 Agent 任务并推送结果摘要。',
   version: '4.1.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://automation-tools',

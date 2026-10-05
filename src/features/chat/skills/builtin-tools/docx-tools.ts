@@ -19,7 +19,7 @@ export const docxToolsSkill: SkillDefinition = {
     'DOCX 文档读写编辑能力组，支持结构化读取、表格提取、元数据查询、DOCX 文件生成、round-trip 编辑和文本替换。' +
     '当用户需要分析/创建/编辑 Word 文档时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://docx-tools',

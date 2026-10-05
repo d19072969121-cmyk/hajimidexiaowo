@@ -51,7 +51,7 @@ export const workspaceToolsSkill: SkillDefinition = {
   name: 'workspace-tools',
   description: '工作区协作与本地运行时能力组：创建多 Agent 协作工作区、注册或即时派发 Worker（workspace_create/create_agent/subagent_call）、共享上下文和文档；并提供受授权目录约束的本地文件读取/列目录、会话产物写入，以及经用户审批的本地 shell 命令预检与执行。当需要多 Agent 协作、读取用户授权的本地资料，或在本机执行命令类任务时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://workspace-tools',

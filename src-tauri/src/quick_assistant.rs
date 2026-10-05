@@ -61,7 +61,7 @@ mod desktop {
             WINDOW_LABEL,
             tauri::WebviewUrl::App("index.html?window=quick-assistant".into()),
         )
-        .title("Deep Student - Quick Learning")
+        .title("AI Study - Quick Learning")
         .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .max_inner_size(MAX_WIDTH, MAX_HEIGHT)

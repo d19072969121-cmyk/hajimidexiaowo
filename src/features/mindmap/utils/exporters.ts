@@ -282,7 +282,7 @@ export async function exportToXmindZip(doc: MindMapDocument, title?: string): Pr
   const zip = new JSZip();
   zip.file('content.json', JSON.stringify(buildXmindContentJson(doc, title)));
   zip.file('metadata.json', JSON.stringify({
-    creator: { name: 'Deep Student', version: '1.0' },
+    creator: { name: 'AI Study', version: '1.0' },
   }));
   zip.file('manifest.json', JSON.stringify({
     'file-entries': { 'content.json': {}, 'metadata.json': {} },

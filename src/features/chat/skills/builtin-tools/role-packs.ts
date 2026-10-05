@@ -17,7 +17,7 @@ export const rolePacksSkill: SkillDefinition = {
   description:
     '精选岗位专家与可审计工作流入口。提供 finance、legal、hr、operations、admin、research、teaching、content 的版本化 Role Packs，以及 invoice reconcile、contract review、resume batch、mail merge、operations report 工作流。只读发现/校验；高风险结论和最终发送必须人工终审。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 9,
   location: 'builtin',
   sourcePath: 'builtin://role-packs',

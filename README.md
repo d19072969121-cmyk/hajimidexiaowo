@@ -2,10 +2,12 @@
 
 [简体中文](./README_CN.md) | **English**
 
-<img src="./public/deepstudent-logo.svg" alt="DeepStudent" width="200" />
+<img src="./public/ai-study-logo-832.png" alt="AI Study" width="200" />
 
 
 ### An open-source, local-first AI learning workbench
+
+> A derivative work of [Deep Student](https://github.com/helixnow/deep-student) (AGPL-3.0).
 
 > It's not that learning is hard — it's that learning tools are too scattered.
 
@@ -14,15 +16,15 @@ Study materials, note-taking, mind maps, quizzes, translation, and flashcard rev
 > Think of it as: **research notebook + knowledge workspace + mind mapping + practice + translation**
 > but they all share the same learning data and workflow.
 
-[![Release](https://img.shields.io/github/v/release/helixnow/deep-student?color=blue&label=release)](https://github.com/helixnow/deep-student/releases/latest)
+[![Release](https://img.shields.io/github/v/release/d19072969121-cmyk/hajimidexiaowo?color=blue&label=release)](https://github.com/d19072969121-cmyk/hajimidexiaowo/releases/latest)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/helixnow/deep-student?style=social)](https://github.com/helixnow/deep-student)
+[![Stars](https://img.shields.io/github/stars/d19072969121-cmyk/hajimidexiaowo?style=social)](https://github.com/d19072969121-cmyk/hajimidexiaowo)
 
-[Website](https://deepstudent.cn) ·
+[GitHub](https://github.com/d19072969121-cmyk/hajimidexiaowo) ·
 [**Download**](#installation) ·
-[Quick Start](https://deepstudent.cn/docs/) ·
-[User Guide](https://deepstudent.cn/docs/) ·
-[Report Issues](https://github.com/helixnow/deep-student/issues) ·
+[Quick Start](#installation) ·
+[User Guide](https://github.com/d19072969121-cmyk/hajimidexiaowo#readme) ·
+[Report Issues](https://github.com/d19072969121-cmyk/hajimidexiaowo/issues) ·
 [Contributing](./.github/CONTRIBUTING.md)
 
 </div>
@@ -334,7 +336,7 @@ Your learning data stays under your control.
 [![Linux](https://img.shields.io/badge/-Linux-orange?style=flat-square&logo=linux&logoColor=white)](#installation)
 [![Android](https://img.shields.io/badge/-Android-green?style=flat-square&logo=android&logoColor=white)](#installation)
 
-Download the latest version from [GitHub Releases](https://github.com/helixnow/deep-student/releases/latest):
+Download the latest version from [GitHub Releases](https://github.com/d19072969121-cmyk/hajimidexiaowo/releases/latest):
 
 | Platform | Package | Architecture |
 |:---:|---|---|
@@ -462,7 +464,7 @@ DeepStudent
 ### Local Development
 
 ```bash
-git clone https://github.com/helixnow/deep-student.git
+git clone https://github.com/d19072969121-cmyk/hajimidexiaowo.git
 cd deep-student
 
 npm ci
@@ -477,8 +479,8 @@ For more build and packaging info, see [BUILD-CONFIG.md](./docs/BUILD-CONFIG.md)
 
 | Document | Description |
 |------|------|
-| [Quick Start](./docs/user-guide/01-快速上手.md) | 10-minute getting started guide (Chinese, [online version](https://deepstudent.cn/docs/)) |
-| [User Guide](./docs/user-guide/README.md) | Complete feature documentation for desktop & mobile (Chinese, [online version](https://deepstudent.cn/docs/)) |
+| [Quick Start](./docs/user-guide/01-快速上手.md) | 10-minute getting started guide (Chinese, in-repo) |
+| [User Guide](./docs/user-guide/README.md) | Complete feature documentation for desktop & mobile (Chinese, in-repo) |
 | [Build Configuration](./docs/BUILD-CONFIG.md) | Cross-platform build & packaging |
 | [Changelog](./CHANGELOG.md) | Version change history |
 | [Security Policy](./.github/SECURITY.md) | Vulnerability reporting process |
@@ -524,7 +526,7 @@ Help make DeepStudent better.
 
 1. Read [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for development workflow
 2. Ensure `npm run lint` and type checks pass before submitting a PR
-3. Bugs & suggestions via [Issues](https://github.com/helixnow/deep-student/issues)
+3. Bugs & suggestions via [Issues](https://github.com/d19072969121-cmyk/hajimidexiaowo/issues)
 
 ---
 

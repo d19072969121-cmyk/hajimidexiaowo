@@ -1583,7 +1583,7 @@ pub fn run() {
                                 let _ = app_for_close
                                     .notification()
                                     .builder()
-                                    .title("Deep Student 正在后台运行")
+                                    .title("AI Study 正在后台运行")
                                     .body("已启用的定时任务会继续按计划执行。")
                                     .show();
                             }
@@ -1670,7 +1670,7 @@ pub fn run() {
                                 let ax_window = NSString::alloc(nil).init_str("AXWindow");
                                 let ax_standard_window =
                                     NSString::alloc(nil).init_str("AXStandardWindow");
-                                let ax_title = NSString::alloc(nil).init_str("Deep Student");
+                                let ax_title = NSString::alloc(nil).init_str("AI Study");
                                 let _: () = msg_send![ns_window, setAccessibilityElement: YES];
                                 let _: () = msg_send![ns_window, setAccessibilityRole: ax_window];
                                 let _: () =

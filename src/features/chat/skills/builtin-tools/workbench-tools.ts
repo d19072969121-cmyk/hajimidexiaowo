@@ -152,7 +152,7 @@ export const workbenchToolsSkill: SkillDefinition = {
   description:
     'ACR 3.0 学习桌面 Agent 操控：发现子应用能力、精确观察一个窗口、在会话隔离事务中按稳定引用执行并验证语义动作、等待状态变化，以及兼容旧版窗口工具。用户要求“展示/演示/让我看你操作”等可见操作时必须使用本组，并与 canvas-note 等领域工具配合完成真实窗口演出。受 tools.workbench_agent 与 desktop.workbenchAgentControl 双闸约束。',
   version: '3.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://workbench-tools',

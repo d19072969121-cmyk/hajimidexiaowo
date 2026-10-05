@@ -30,7 +30,7 @@ export const skillInstallerSkill: SkillDefinition = {
   description:
     '从链接安装技能包：用户粘贴 GitHub 仓库/子目录链接、SKILL.md 原始链接、zip 直链或社区市场/skills.sh 页面链接时使用。社区市场使用 builtin-skill_market_search / builtin-skill_market_skill_detail 只读检索，安装仍需用户确认后走 skill_market_download_and_scan / skill_install。支持采用标准 SKILL.md 格式的 AgentSkills 技能。',
   version: '1.3.1',
-  author: 'Deep Student',
+  author: 'AI Study',
   location: 'builtin',
   sourcePath: 'builtin://skill-installer',
   priority: SKILL_DEFAULT_PRIORITY,

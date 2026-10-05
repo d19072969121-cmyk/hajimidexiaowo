@@ -45,7 +45,7 @@ export const sessionManagerSkill: SkillDefinition = {
   description:
     '会话管理能力组，让 AI 具备查询、阅读、导出、导入、组织和维护用户会话的能力。当用户需要整理会话、搜索或总结历史对话、导出会话、导入会话 JSON、批量打标签、查看会话统计时使用。',
   version: '1.2.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://session-manager',

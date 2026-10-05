@@ -13,7 +13,7 @@ export const webFetchSkill: SkillDefinition = {
   name: 'web-fetch',
   description: 'Web 内容抓取能力，用于获取指定 URL 的网页内容并转换为 Markdown 格式。当用户需要阅读某个网页、查看文章内容时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 9,
   location: 'builtin',
   sourcePath: 'builtin://web-fetch',

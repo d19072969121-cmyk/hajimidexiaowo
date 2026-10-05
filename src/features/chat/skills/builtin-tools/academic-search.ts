@@ -14,7 +14,7 @@ export const academicSearchSkill: SkillDefinition = {
   description:
     '学术论文搜索与管理能力组，支持 arXiv 预印本搜索、OpenAlex 学术搜索（覆盖 2.4 亿+ 篇论文，国内可直连）、论文 PDF 下载保存到资料库、引用格式化（BibTeX/GB/T 7714/APA）。当用户需要查找、下载、引用学术论文时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://academic-search',

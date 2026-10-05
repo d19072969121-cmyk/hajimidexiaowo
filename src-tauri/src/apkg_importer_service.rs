@@ -2604,7 +2604,7 @@ mod tests {
             id: id.to_string(),
             name: format!("Round-trip {id}"),
             description: "APKG round-trip fixture".to_string(),
-            author: Some("Deep Student".to_string()),
+            author: Some("AI Study".to_string()),
             version: "1.0.0".to_string(),
             preview_front: String::new(),
             preview_back: String::new(),

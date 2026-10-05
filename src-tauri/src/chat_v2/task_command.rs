@@ -51,7 +51,7 @@ const GOAL_PREVIEW_CHARS: usize = 50;
 
 /// 远程批准写操作（P2 预留）的 P1 指引文案
 pub const APPROVE_GUIDANCE: &str =
-    "远程暂不支持批准写操作。涉及文件写入 / 命令执行的审批，请在桌面端 Deep Student 中确认。";
+    "远程暂不支持批准写操作。涉及文件写入 / 命令执行的审批，请在桌面端 AI Study 中确认。";
 
 // ============================================================================
 // 绑定与路由
@@ -230,7 +230,7 @@ pub fn parse_inbound(text: &str) -> ParsedInbound {
 
 /// 帮助文案
 pub fn help_text() -> String {
-    "我可以把消息当作任务交给桌面端的 Deep Student 执行：\n\
+    "我可以把消息当作任务交给桌面端的 AI Study 执行：\n\
      · 直接发消息 = 创建任务（任务运行中再发 = 忙线提示，完成后发 = 继续该任务）\n\
      · /new <目标> = 强制创建新任务\n\
      · 停止 或 /stop = 停止当前任务\n\

@@ -28,7 +28,7 @@ export const ptcRunSkill: SkillDefinition = {
   description:
     'PTC 程序化工具组合能力：提交一段 Starlark 脚本，用 call(tool, args) 串行组合注册表白名单内工具，并可向 artifacts 写受控产物。适合多步检索/过滤/合并/生成场景，一次调用替代多轮工具往返。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 1,
   location: 'builtin',
   sourcePath: 'builtin://ptc-run',

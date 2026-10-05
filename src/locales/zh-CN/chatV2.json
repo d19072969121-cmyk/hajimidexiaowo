@@ -1213,7 +1213,7 @@
     "renameEmptyError": "请输入会话名称",
     "renameFailed": "重命名失败，请稍后重试",
     "sessionNamePlaceholder": "输入会话名称",
-    "welcome": "欢迎使用 DeepStudent",
+    "welcome": "欢迎使用 AI Study",
     "newChat": "新对话",
     "mobileDrawerSubtitle": "从这里开始学习",
     "selectOrCreate": "选择一个会话或创建新会话开始聊天",

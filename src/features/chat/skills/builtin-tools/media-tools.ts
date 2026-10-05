@@ -5,7 +5,7 @@ export const mediaToolsSkill: SkillDefinition = {
   name: 'media-tools',
   description: '使用应用已有的受管 ASR 模型把附件音频转写为可追溯的任务 artifact，并查询音视频运行时能力。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://media-tools',

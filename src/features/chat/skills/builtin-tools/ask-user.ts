@@ -14,7 +14,7 @@ export const askUserSkill: SkillDefinition = {
   name: '用户提问',
   description: '向用户提出轻量级问题以确认偏好或澄清需求，不中断工具调用循环。当需要了解用户偏好、确认方向或在多个等价方案中选择时使用。',
   version: '1.2.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://ask-user',

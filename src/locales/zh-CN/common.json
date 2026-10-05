@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "Deep Student",
-    "title": "Deep Student",
+    "name": "AI Study",
+    "title": "AI Study",
     "description": "AI驱动的智能学习助手",
     "version": "版本",
     "default_header": "新对话"
@@ -3463,7 +3463,7 @@
     }
   },
   "welcome_onboarding": {
-    "title": "欢迎使用 DeepStudent",
+    "title": "欢迎使用 AI Study",
     "subtitle": "本地优先的 AI 学习工作台，数据保存在你自己的设备上。",
     "language_label": "界面语言 / Language",
     "lang_zh": "简体中文",
@@ -3614,7 +3614,7 @@
   "legal": {
     "userAgreement": {
       "title": "用户协议与隐私政策",
-      "welcomeTitle": "欢迎使用 DeepStudent",
+      "welcomeTitle": "欢迎使用 AI Study",
       "welcomeDesc": "在开始使用之前，请阅读并同意以下协议。",
       "agreementTitle": "用户协议",
       "privacyTitle": "隐私政策",
@@ -3622,7 +3622,7 @@
       "agreeAndContinue": "我已阅读并同意",
       "mustAgree": "请先阅读并同意用户协议和隐私政策",
       "agreementContent": {
-        "intro": "DeepStudent 是一个基于人工智能的本地化学习工具。使用本软件即表示您同意以下条款：",
+        "intro": "AI Study 是一个基于人工智能的本地化学习工具。使用本软件即表示您同意以下条款：",
         "aiFeatures": "AI 功能说明",
         "aiFeaturesDesc": "本软件集成第三方大语言模型（LLM）API 服务，用于智能对话、笔记辅助、卡片生成等功能。AI 生成的内容仅供参考，不构成任何专业建议。",
         "dataProcessing": "数据处理方式",
@@ -3652,7 +3652,7 @@
       "sections": {
         "overview": {
           "title": "概述",
-          "content": "DeepStudent 是一个本地优先的学习工具，致力于保护您的隐私。本政策说明我们如何收集、使用和保护您的数据。"
+          "content": "AI Study 是一个本地优先的学习工具，致力于保护您的隐私。本政策说明我们如何收集、使用和保护您的数据。"
         },
         "localStorage": {
           "title": "本地数据存储",
@@ -3668,7 +3668,7 @@
         },
         "cloudSync": {
           "title": "云同步（可选）",
-          "content": "您可以选择将数据同步到自行配置的云存储。Android 仅支持 WebDAV；桌面端还可使用 S3 兼容存储与实验性 FTP。此功能默认关闭，仅在您主动配置并触发时才会传输数据。数据不会发到 Deep Student 的服务器。"
+          "content": "您可以选择将数据同步到自行配置的云存储。Android 仅支持 WebDAV；桌面端还可使用 S3 兼容存储与实验性 FTP。此功能默认关闭，仅在您主动配置并触发时才会传输数据。数据不会发到 AI Study 的服务器。"
         },
         "noTracking": {
           "title": "无行为追踪",
@@ -3714,7 +3714,7 @@
         "llmData": "AI 请求数据",
         "llmDataDesc": "使用 AI 功能时，对话内容发送至您配置的 LLM API 服务商",
         "syncData": "同步数据（可选）",
-        "syncDataDesc": "如启用云同步，数据只发到您自己配置的存储（Android 仅 WebDAV；桌面另有 S3 兼容存储与实验性 FTP），不是 Deep Student 的服务器",
+        "syncDataDesc": "如启用云同步，数据只发到您自己配置的存储（Android 仅 WebDAV；桌面另有 S3 兼容存储与实验性 FTP），不是 AI Study 的服务器",
         "sentryData": "错误报告（可选）",
         "sentryDataDesc": "如启用，匿名崩溃信息发送至错误报告服务",
         "crossBorderNote": "跨境传输提示",
@@ -4019,7 +4019,30 @@
     "mistakePreview": "错题本",
     "loadFailed": "错题本加载失败：{{msg}}",
     "searchTags": "搜索标签…",
-    "noTagMatch": "没有匹配的标签"
+    "noTagMatch": "没有匹配的标签",
+    "timeFilterLabel": "时间",
+    "timeAll": "全部",
+    "timeThisMonth": "本月",
+    "timeLastMonth": "上月",
+    "timeLast3Months": "近三月",
+    "timeThisYear": "今年",
+    "timeUnknown": "未知时间",
+    "groupByMonth": "按月份分类",
+    "groupNone": "不分组",
+    "noteLabel": "备注",
+    "notePlaceholder": "例：3 月月考，数学卷第 18 题",
+    "noteHint": "可记考试时间、哪张卷子等",
+    "noteSave": "保存",
+    "noteCancel": "取消",
+    "noteEdit": "编辑备注",
+    "noteAdd": "加备注",
+    "noteSaved": "备注已保存",
+    "noteSaveFailed": "备注保存失败：{{msg}}",
+    "noteEmpty": "暂无备注",
+    "noteTooLong": "备注最多 {{max}} 字",
+    "removeTag": "移除标签 {{tag}}",
+    "tagPlaceholder": "标签名",
+    "openSettingsForDiagnosis": "若反复失败，去「设置」检查数据状态"
   },
   "capture": {
     "title": "拍题",

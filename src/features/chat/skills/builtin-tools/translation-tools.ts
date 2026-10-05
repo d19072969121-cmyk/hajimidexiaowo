@@ -60,7 +60,7 @@ export const translationToolsSkill: SkillDefinition = {
   description:
     '批量、术语约束与可入库翻译工具。把最长 500000 字符的文本按段交给真实翻译模型，支持正式度、领域和内联术语；长结果以短期引用传给独立保存步骤。普通聊天中的一句即时翻译通常直接回答即可。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://translation-tools',

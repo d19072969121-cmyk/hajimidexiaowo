@@ -32,20 +32,20 @@
     "load_failed": "Failed to load voice input settings.",
     "save_failed": "Failed to save voice input settings.",
     "shortcut_title": "Dictation Shortcut",
-    "shortcut_description": "Choose how the app-wide shortcut behaves inside DeepStudent. Dictation still inserts into the active supported input and never auto-sends.",
+    "shortcut_description": "Choose how the app-wide shortcut behaves inside AI Study. Dictation still inserts into the active supported input and never auto-sends.",
     "hotkey": "Hotkey",
     "max_duration_ms": "Max Duration (ms)",
     "hold_mode_title": "Press and hold the dictation shortcut",
-    "hold_mode_description": "Hold the shortcut anywhere inside a supported DeepStudent input to dictate, then release to stop.",
+    "hold_mode_description": "Hold the shortcut anywhere inside a supported AI Study input to dictate, then release to stop.",
     "toggle_mode_title": "Tap once to start, tap once to stop",
-    "toggle_mode_description": "Use the same shortcut as a toggle when you want hands-free dictation inside DeepStudent.",
+    "toggle_mode_description": "Use the same shortcut as a toggle when you want hands-free dictation inside AI Study.",
     "mode_active": "Active",
     "mode_select": "Use This Mode",
     "quick_actions_title": "Setup & Recovery",
     "quick_actions_description": "Jump straight to model assignment, provider credentials, and usage analytics when dictation needs attention.",
     "dictionary_title": "Dictation Vocabulary",
     "dictionary_description": "Add words or short phrases that dictation should prefer to recognize. Use one item per line.",
-    "dictionary_placeholder": "Photosynthesis\nAnkylosing spondylitis\nDeepStudent",
+    "dictionary_placeholder": "Photosynthesis\nAnkylosing spondylitis\nAI Study",
     "dictionary_count": "{{count}} phrase hints",
     "dictionary_hint": "These hints are merged into the ASR prompt when supported.",
     "history_title": "Recent Dictation History",
@@ -396,6 +396,11 @@
   },
   "vendor_panel": {
     "add_vendor_button": "Add Provider",
+    "auto_fetch_models_button": "Auto Fetch Models",
+    "auto_fetch_models_fetching": "Fetching models…",
+    "auto_fetch_models_success": "Added {{count}} model(s) automatically",
+    "auto_fetch_models_empty": "No new models to add (all available models are already added)",
+    "auto_fetch_models_failed": "Auto fetch models failed: {{error}}",
     "add_model_button": "Add Model",
     "list_title": "Provider List",
     "empty_vendors": "No providers yet",
@@ -589,6 +594,9 @@
       "mistral": "Mistral",
       "openrouter": "OpenRouter",
       "ollama": "Ollama",
+      "pollinations": "Pollinations (No Key)",
+      "llmtech": "LLM Tech (No Key)",
+      "kilo": "Kilo Gateway (No Key)",
       "custom": "Custom"
     },
     "base_url_label": "Base URL",
@@ -941,7 +949,7 @@
       "background_disabled": "Background running turned off."
     },
     "errors": {
-      "desktop_only": "Automation management requires the Deep Student desktop app.",
+      "desktop_only": "Automation management requires the AI Study desktop app.",
       "invalid_response": "The automation list returned invalid data.",
       "version_conflict": "This automation changed while it was open. The latest version has been reloaded; review it before editing again.",
       "name_required": "Name cannot be empty.",
@@ -1023,7 +1031,7 @@
       "cta": "New profile"
     },
     "errors": {
-      "desktop_only": "Subagent profile management requires the Deep Student desktop app.",
+      "desktop_only": "Subagent profile management requires the AI Study desktop app.",
       "reveal_failed": "Could not open the profiles directory. Check that it exists.",
       "name_required": "Please enter a profile name",
       "name_invalid": "Name may only contain lowercase letters, digits and hyphens (max 64 characters)",
@@ -1064,7 +1072,7 @@
   },
   "system_authorization": {
     "title": "System Permissions",
-    "description": "Manage the system access Deep Student needs to run on this computer. Access is requested only when you use the related feature.",
+    "description": "Manage the system access AI Study needs to run on this computer. Access is requested only when you use the related feature.",
     "request": "Authorize",
     "open_settings": "Open Settings",
     "refresh": "Refresh Status",
@@ -1079,12 +1087,12 @@
     "notifications": {
       "title": "System Notifications",
       "description": "Allow pomodoro, todo reminders, and background automations to send system notifications when needed.",
-      "denied_hint": "Notification access was denied. Allow Deep Student to send notifications in System Settings."
+      "denied_hint": "Notification access was denied. Allow AI Study to send notifications in System Settings."
     },
     "microphone": {
       "title": "Microphone",
       "description": "Allow voice input to capture audio only after you actively start dictation.",
-      "denied_hint": "Microphone access was denied. Allow Deep Student to use the microphone in System Settings."
+      "denied_hint": "Microphone access was denied. Allow AI Study to use the microphone in System Settings."
     },
     "files": {
       "title": "Files and Folders",
@@ -1212,13 +1220,13 @@
   "acknowledgements": {
     "openSource": {
       "title": "Open Source Acknowledgements",
-      "description": "DeepStudent grows thanks to the open-source communities listed below. Thank you for keeping the ecosystem moving forward.",
+      "description": "AI Study grows thanks to the open-source communities listed below. Thank you for keeping the ecosystem moving forward.",
       "openDialog": "View acknowledgements",
       "closeDialog": "Close",
       "projectLicense": "Project license",
       "thirdPartyLicense": "Third-party licenses",
-      "projectLicenseDescription": "GNU Affero General Public License for DeepStudent.",
-      "thirdPartyLicenseDescription": "License and attribution notices for components distributed with DeepStudent.",
+      "projectLicenseDescription": "GNU Affero General Public License for AI Study.",
+      "thirdPartyLicenseDescription": "License and attribution notices for components distributed with AI Study.",
       "backToAcknowledgements": "Back to acknowledgements",
       "loadingLicenses": "Loading license text...",
       "licenseLoadError": "The license text could not be loaded.",
@@ -1242,8 +1250,18 @@
       "cards": {
         "siliconflow": {
           "title": "SiliconFlow",
-          "description": "Provides multimodal and reasoning model services, ensuring DeepStudent runs reliably within the domestic compute ecosystem.",
+          "description": "Provides multimodal and reasoning model services, ensuring AI Study runs reliably within the domestic compute ecosystem.",
           "alt": "Powered by SiliconFlow"
+        },
+        "dsha": {
+          "title": "DSHA",
+          "description": "AI Study is developed and built on Android devices with DSHA (DeepSeek Harness for Android).",
+          "alt": "Developed with DSHA"
+        },
+        "deepstudent": {
+          "title": "Deep Student",
+          "description": "AI Study is a derivative project of Deep Student. Thanks to the upstream open-source work it is built upon.",
+          "alt": "Based on Deep Student"
         }
       }
     },
@@ -1253,10 +1271,12 @@
         "developer": "Developer",
         "version": "Version",
         "license": "License",
-        "platforms": "Supported Platforms"
+        "platforms": "Supported Platforms",
+        "basedOn": "Based On"
       },
       "values": {
-        "platforms": "Windows / macOS / iPadOS / Android"
+        "platforms": "Android",
+        "basedOn": "A derivative work of Deep Student"
       }
     },
     "links": {

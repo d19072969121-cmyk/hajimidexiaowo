@@ -28,7 +28,7 @@ export const dstuToolsSkill: SkillDefinition = {
   description:
     'DSTU/VFS 学习资源组织写入能力组：创建和重命名文件夹、重命名或移动资源、软删除与回收站恢复、收藏、永久删除，以及把授权 runtime root 中的文件上传到资源库。浏览、筛选和读取资源时配合 learning-resource 技能使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://dstu-tools',

@@ -82,7 +82,7 @@ export async function exportConversationSnapshotToFile(options: ExportSessionToF
     if (messages.length > 100_000) throw new Error('Snapshot exceeds message limit');
     const content = JSON.stringify({ format: meta.format, version: meta.version, exportedAt: meta.exportedAt, appVersion: meta.appVersion, session: meta.session, sessionState: meta.sessionState, messages, blocks });
     const baseName = sanitizeFileName(options.title ?? '') || options.sessionId;
-    const result = await fileManager.saveTextFile({ title: i18n.t('chatV2:browser.exportSession'), defaultFileName: `${baseName}.deepstudent.json`, filters: [{ name: 'Deep Student Snapshot', extensions: ['json'] }], content });
+    const result = await fileManager.saveTextFile({ title: i18n.t('chatV2:browser.exportSession'), defaultFileName: `${baseName}.deepstudent.json`, filters: [{ name: 'AI Study Snapshot', extensions: ['json'] }], content });
     if (!result.canceled) showGlobalNotification('success', i18n.t('chatV2:browser.exportSuccess', { messageCount: messages.length, path: result.path ?? '' }));
   } catch (error) {
     showGlobalNotification('error', getErrorMessage(error));
@@ -93,7 +93,7 @@ export async function exportConversationSnapshotToFile(options: ExportSessionToF
 export async function importConversationSnapshotFromFile(): Promise<void> {
   const { importConversationSnapshot } = await import('../../api/sessionBrowserApi');
   try {
-    const path = await fileManager.pickSingleFile({ title: i18n.t('chatV2:browser.importSession'), filters: [{ name: 'Deep Student Snapshot', extensions: ['json'] }] });
+    const path = await fileManager.pickSingleFile({ title: i18n.t('chatV2:browser.importSession'), filters: [{ name: 'AI Study Snapshot', extensions: ['json'] }] });
     if (!path) return;
     const content = await fileManager.readTextFile(path);
     if (new TextEncoder().encode(content).byteLength > 50 * 1024 * 1024) {

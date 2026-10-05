@@ -53,9 +53,29 @@ async function fetchJsonWithTimeout(url: string, timeoutMs: number): Promise<any
   }
 }
 
-const R2_LATEST_URL = 'https://download.deepstudent.cn/releases/latest.json';
-const GH_LATEST_URL = 'https://github.com/helixnow/deep-student/releases/latest/download/latest.json';
-const GH_RELEASES_PAGE = 'https://github.com/helixnow/deep-student/releases/latest';
+/**
+ * 更新源仓库（AI Study 二创版）。
+ *
+ * 原上游为 helixnow/deep-student，本二创版改为自有仓库 + 自有 Releases。
+ * 仓库地址是唯一的来源真相：改仓库时只改这两行，下方所有 URL 由它们派生。
+ */
+const UPDATE_REPO = 'd19072969121-cmyk/hajimidexiaowo';
+const UPDATE_REPO_URL = `https://github.com/${UPDATE_REPO}`;
+
+/**
+ * 主更新源（原为 download.deepstudent.cn 的 CDN 镜像，国内更快）。
+ *
+ * 二创版暂无自有 CDN，因此与 GH_LATEST_URL 同源（都指向本仓 Releases）。
+ * 保留独立常量是为了将来接入 CDN 时只改这一行，不必动探测逻辑。
+ */
+const R2_LATEST_URL = `${UPDATE_REPO_URL}/releases/latest/download/latest.json`;
+
+/** GitHub Releases 的 latest.json asset（本仓 Releases 需要附带此文件） */
+const GH_LATEST_URL = `${UPDATE_REPO_URL}/releases/latest/download/latest.json`;
+/** 面向用户展示的 Releases 页面 */
+const GH_RELEASES_PAGE = `${UPDATE_REPO_URL}/releases/latest`;
+/** Release assets 的下载直链前缀（APK 从这里取） */
+const GH_RELEASE_DOWNLOAD_BASE = `${UPDATE_REPO_URL}/releases/download`;
 
 /**
  * 探测最新发布的渠道：R2 优先，GitHub latest.json asset 兜底。
@@ -202,6 +222,14 @@ export interface UpdateInfo {
   version: string;
   date?: string;
   body?: string;
+  /**
+   * 发布方声明的 Android versionCode（来自 latest.json）。
+   *
+   * 用途：与 `currentVersionCode()` 比对 —— 版本名可能相同但 code 更大
+   * （同一 version 下重发包），此时仍应视为有更新。
+   * 缺省表示发布方未声明，退回纯版本名比对。
+   */
+  versionCode?: number;
   /** R2 镜像 APK 下载地址（仅移动端从 R2 latest.json 获取） */
   apkUrl?: string;
 }
@@ -362,7 +390,7 @@ export function useAppUpdater(): AppUpdaterController {
         if (!latestVersion) {
           const ghController = new AbortController();
           const ghTimeout = setTimeout(() => ghController.abort(), 10000);
-          const resp = await safeFetch('https://api.github.com/repos/helixnow/deep-student/releases/latest', {
+          const resp = await safeFetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
             headers: { Accept: 'application/vnd.github+json' },
             signal: ghController.signal,
           }).finally(() => clearTimeout(ghTimeout));
@@ -377,7 +405,7 @@ export function useAppUpdater(): AppUpdaterController {
           if (!apkUrl && tagName) {
             const apkAsset = (data.assets as any[])?.find((a: any) => a.name?.endsWith('.apk'));
             if (apkAsset) {
-              apkUrl = `https://download.deepstudent.cn/releases/${tagName}/${apkAsset.name}`;
+              apkUrl = `${GH_RELEASE_DOWNLOAD_BASE}/${tagName}/${apkAsset.name}`;
             }
           }
           // GitHub API 不含 channel，从 GitHub Release 的 latest.json asset 补取
@@ -560,7 +588,7 @@ export function useAppUpdater(): AppUpdaterController {
 
       // 写入应用私有缓存目录（FileProvider 仅暴露该 updates/ 子目录给安装器）。
       // 注意：fs open 的 create 不会创建父目录，必须先 mkdir。
-      const fileName = `DeepStudent-v${version}.apk`;
+      const fileName = `AIStudy-v${version}.apk`;
       await mkdir('updates', { baseDir: BaseDirectory.AppCache, recursive: true });
       const file = await open(`updates/${fileName}`, {
         create: true,

@@ -12,7 +12,7 @@ export const rootRequestToolsSkill: SkillDefinition = {
   description:
     'Runtime root 只读授权请求：当 self_inspect 发现缺少某本地目录授权时，向用户说明用途后发起审批；用户批准后等价于在 Settings > 工具权限 手动添加 authorized root。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://root-request-tools',

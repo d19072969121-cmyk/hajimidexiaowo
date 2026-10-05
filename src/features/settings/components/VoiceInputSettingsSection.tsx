@@ -680,7 +680,7 @@ export function VoiceInputSettingsSection({ assignedModel, embedded = false }: V
             onBlur={(event) => handlePersistVocabulary(event.currentTarget.value)}
             rows={4}
             placeholder={t('settings:voice_input.dictionary_placeholder', {
-              defaultValue: 'Photosynthesis\nAnkylosing spondylitis\nDeepStudent',
+              defaultValue: 'Photosynthesis\nAnkylosing spondylitis\nAI Study',
             })}
           />
           <div className="mt-1.5 text-xs text-muted-foreground/70">

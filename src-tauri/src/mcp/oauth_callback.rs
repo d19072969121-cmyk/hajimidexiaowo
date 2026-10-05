@@ -192,9 +192,9 @@ async fn handle_callback_request(
 
 fn html_response(status: StatusCode, success: bool) -> Response<Body> {
     let message = if success {
-        "Authorization complete. You can return to Deep Student."
+        "Authorization complete. You can return to AI Study."
     } else {
-        "Authorization could not be completed. Return to Deep Student for details."
+        "Authorization could not be completed. Return to AI Study for details."
     };
     Response::builder()
         .status(status)
@@ -205,7 +205,7 @@ fn html_response(status: StatusCode, success: bool) -> Response<Body> {
         )
         .header("cache-control", "no-store")
         .body(Body::from(format!(
-            "<!doctype html><meta charset=\"utf-8\"><title>Deep Student</title><p>{}</p>",
+            "<!doctype html><meta charset=\"utf-8\"><title>AI Study</title><p>{}</p>",
             message
         )))
         .unwrap_or_else(|_| Response::new(Body::from(message.to_string())))

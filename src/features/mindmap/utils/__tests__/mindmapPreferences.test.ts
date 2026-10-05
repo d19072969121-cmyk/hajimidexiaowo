@@ -11,7 +11,7 @@ function rect(left: number, top: number, width = 40, height = 20): DOMRect {
 describe('mindmap preferences', () => {
   beforeEach(() => localStorage.clear());
 
-  it('defaults to the documented Deep Student keymap', () => {
+  it('defaults to the documented AI Study keymap', () => {
     expect(getMindMapPreferences()).toEqual({
       keymap: 'deep-student',
       canvasNavigation: 'document',

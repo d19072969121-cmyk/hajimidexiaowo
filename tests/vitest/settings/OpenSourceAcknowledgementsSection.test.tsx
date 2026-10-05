@@ -56,7 +56,7 @@ vi.mock('react-i18next', () => ({
       const options = (typeof arg2 === 'object' && arg2 !== null ? arg2 : arg3) ?? {};
       const translations: Record<string, string> = {
         'acknowledgements.openSource.title': '开源项目致谢',
-        'acknowledgements.openSource.description': 'DeepStudent 依托以下成熟的开源生态快速发展，感谢所有社区长期的维护与创新。',
+        'acknowledgements.openSource.description': 'AI Study 依托以下成熟的开源生态快速发展，感谢所有社区长期的维护与创新。',
         'acknowledgements.openSource.openDialog': '查看致谢名单',
         'acknowledgements.openSource.closeDialog': '关闭',
         'acknowledgements.openSource.projectLicense': '项目许可证',
@@ -96,7 +96,7 @@ describe('OpenSourceAcknowledgementsSection', () => {
     render(<OpenSourceAcknowledgementsSection />);
 
     expect(screen.getByText('开源项目致谢')).toBeInTheDocument();
-    expect(screen.getByText('DeepStudent 依托以下成熟的开源生态快速发展，感谢所有社区长期的维护与创新。')).toBeInTheDocument();
+    expect(screen.getByText('AI Study 依托以下成熟的开源生态快速发展，感谢所有社区长期的维护与创新。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查看致谢名单' })).toBeInTheDocument();
     expect(screen.queryByText('9 个生态分组，77 个项目')).not.toBeInTheDocument();
     expect(screen.queryByText('核心框架与构建')).not.toBeInTheDocument();

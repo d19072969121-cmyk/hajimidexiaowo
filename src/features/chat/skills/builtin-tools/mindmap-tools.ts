@@ -12,7 +12,7 @@ export const mindmapToolsSkill: SkillDefinition = {
   name: 'mindmap-tools',
   description: '思维导图创建、编辑与文件导入能力。当用户明确要求创建思维导图、知识导图、脑图，或要求把上传的 .xmind/.opml/.mm/.mmap/Markdown 等文件导入为思维导图时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   location: 'builtin',
   sourcePath: 'builtin://mindmap-tools',
   isBuiltin: true,

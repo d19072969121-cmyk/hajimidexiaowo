@@ -13,7 +13,7 @@ export const userTodoToolsSkill: SkillDefinition = {
   name: 'user-todo-tools',
   description: '用户个人待办事项管理能力组（持久化存储），用于创建、查找、更新、完成、删除与恢复待办项和清单。当用户提到"帮我添加待办""我今天有什么任务""建一个清单""提醒我..."等个人待办请求时使用。❗ 本工具操作用户的真实待办数据，与 AI 内部任务进度管理（todo-tools）无关。',
   version: '2.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 6,
   location: 'builtin',
   sourcePath: 'builtin://user-todo-tools',

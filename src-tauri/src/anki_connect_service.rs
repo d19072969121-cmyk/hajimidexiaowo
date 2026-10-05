@@ -725,7 +725,7 @@ async fn invoke_anki_connect_action(
 /// 用自定义模板在 Anki 中创建模型（createModel）。
 /// 字段、正反面 HTML 模板与 CSS 都来自 custom_template。
 pub fn template_model_name(template: &crate::models::CustomAnkiTemplate) -> String {
-    format!("Deep Student / {} / v{}", template.id, template.version)
+    format!("AI Study / {} / v{}", template.id, template.version)
 }
 
 fn model_templates(template: &crate::models::CustomAnkiTemplate) -> serde_json::Value {

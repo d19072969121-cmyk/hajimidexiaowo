@@ -65,7 +65,7 @@
     "spatialNavigation": "Spatial canvas arrow navigation",
     "descriptionFirstLine": "Preview first description line only",
     "classicKeymapActive": "Classic outline keymap: Cmd+Enter completes, Shift+Enter edits description, Cmd+[/] focuses; Alt+[/] folds.",
-    "deepStudentKeymapActive": "Deep Student default keymap: Cmd+Enter adds a child, Shift+Enter inserts a line; Alt+[/] folds."
+    "deepStudentKeymapActive": "AI Study default keymap: Cmd+Enter adds a child, Shift+Enter inserts a line; Alt+[/] folds."
   },
   "export": {
     "title": "Export",

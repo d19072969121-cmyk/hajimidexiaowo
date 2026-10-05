@@ -444,7 +444,7 @@
     "switch_failed": "Operation failed: {{error}}"
   },
   "recovery": {
-    "shell_title": "Deep Student Data Recovery",
+    "shell_title": "AI Study Data Recovery",
     "eyebrow": "Data Governance",
     "preflight_title": "Confirming data status",
     "preflight_description": "Running the startup safety check…",

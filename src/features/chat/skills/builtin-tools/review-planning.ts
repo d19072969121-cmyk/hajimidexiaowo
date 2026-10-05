@@ -16,7 +16,7 @@ export const reviewPlanningSkill: SkillDefinition = {
   description:
     '间隔重复复习计划能力组（SM-2 算法）：查询今日到期复习项、为题目集/错题安排复习计划、提交复习评分自动排期下次复习、查看复习统计与记忆曲线。当用户说"安排复习/今天该复习什么/帮我制定复习计划/记不住"时使用。上游衔接：qbank-tools 导入的错题（session_id 即 exam_id）、essay-grading 批改后入库的错误点，都可通过本技能组转化为持续复习计划。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://review-planning',

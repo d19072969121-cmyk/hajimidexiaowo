@@ -62,7 +62,7 @@ export const subagentWorkerSkill: SkillDefinition = {
   name: 'subagent-worker',
   description: '子代理 Worker 专用技能。自动应用于所有子代理：专注完成主代理委派的任务，最终回答由运行时自动交付给主代理；workspace_send 仅用于中间进度汇报、提问或协作。这是一个系统内部技能，用户无需手动激活。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 10, // 低优先级（数值越小越优先，系统默认为3）
   location: 'builtin',
   sourcePath: 'builtin://subagent-worker',

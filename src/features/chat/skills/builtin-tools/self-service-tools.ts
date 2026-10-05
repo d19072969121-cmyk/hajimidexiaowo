@@ -13,7 +13,7 @@ export const selfServiceToolsSkill: SkillDefinition = {
   description:
     'Agent 自服务自查与 MCP 提案能力：只读、脱敏地查看当前 runtime root、已注册/已加载技能、MCP 配置摘要与 web 搜索配置可见性；可结构化提案新 MCP server（secret 由用户在 Settings 填写）；可通过 mcp_server_update / mcp_server_set_enabled / mcp_server_remove 管理已有 MCP server（修改/删除必审批）；可通过 skill_workshop 提案式沉淀/修改技能（apply 需用户审批）；可通过 skill_set_enabled / skill_remove / skill_trust_request 管理技能生命周期（启停/删除/申请信任，删除与信任必审批）；可通过 custom_agent_* 查看并提案式管理自定义子代理 persona（apply/remove 必审批）。任务开始前或不确定自己有哪些能力时优先使用。',
   version: '1.6.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://self-service-tools',

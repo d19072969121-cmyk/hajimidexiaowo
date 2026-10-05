@@ -31,7 +31,7 @@ export const knowledgeRetrievalSkill: SkillDefinition = {
   name: 'knowledge-retrieval',
   description: '知识检索能力组，包含统一本地搜索和网络搜索工具。当用户需要查询知识库、图片/PDF、用户记忆或获取网络信息时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://knowledge-retrieval',

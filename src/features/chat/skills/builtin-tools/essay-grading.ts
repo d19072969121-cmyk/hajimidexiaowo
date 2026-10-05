@@ -15,7 +15,7 @@ export const essayGradingSkill: SkillDefinition = {
   description:
     '作文批改能力组：提交作文全文调用专业批改流水线（支持高考/中考/雅思/托福/考研/四六级等内置与自定义批阅模式），可选指定已启用模型，返回总分、维度分与逐段批注；支持同一会话多轮修改对比与历史批改查询。当用户要求"批改作文/帮我看看这篇作文/作文打分"时使用。批改结果中的错误点可衔接 qbank-tools 入错题本，再用 review-planning 安排间隔复习，形成完整学习闭环。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://essay-grading',

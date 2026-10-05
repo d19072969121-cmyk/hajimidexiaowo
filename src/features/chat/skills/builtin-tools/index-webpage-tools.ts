@@ -38,7 +38,7 @@ export const indexWebpageToolsSkill: SkillDefinition = {
   description:
     '检查真实 VFS RAG 索引与 OCR 状态、重建指定资源的完整索引，或把 web_fetch 的完整网页内容保存为可检索的知识库 Markdown。适合“为什么搜不到刚导入的 PDF”“把这篇博客存进知识库”等场景。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://index-webpage-tools',

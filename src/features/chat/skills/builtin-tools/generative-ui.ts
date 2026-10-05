@@ -12,7 +12,7 @@ export const generativeUiSkill: SkillDefinition = {
   description:
     '结构化生成式 UI。用于学习简报、进度仪表盘、闪卡预览、复习日历、错题分析等可扫描界面，禁止输出 HTML/JS。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://generative-ui',

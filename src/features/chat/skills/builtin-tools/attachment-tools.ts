@@ -49,7 +49,7 @@ export const attachmentToolsSkill: SkillDefinition = {
   description:
     '附件管理能力组，提供列出、读取、物化对话附件以及受管解压 zip 附件的工具。当用户询问"刚才上传的文件"、"之前的附件"等历史附件内容，或需要把已知附件物化到 temp root、解开 zip 压缩包时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 4,
   location: 'builtin',
   sourcePath: 'builtin://attachment-tools',

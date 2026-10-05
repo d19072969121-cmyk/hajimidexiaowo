@@ -2212,6 +2212,67 @@ mod tests {
 
     /// F2 修复回归：崩溃遗留的僵尸 running anki 块在删除检查时被自动落库为
     /// failed，不再永久阻止会话删除；宽限期内的新鲜 running 块仍然拦截删除。
+    /// E13-S：错题备注（metadata.mistakeNote）落库 + **不抹掉兄弟键**。
+    ///
+    /// 这是 `merge_session_metadata` 为「整块替换」语义的回归防线：
+    /// 前端 `saveMistakeNote` 依赖「先取完整 metadata、只改一个键、再整体回写」，
+    /// 本用例模拟该调用序列，断言 `availableSkillsSnapshot` 等键存活。
+    #[test]
+    fn test_update_session_settings_note_metadata_keeps_sibling_keys() {
+        use crate::data_governance::migration::coordinator::MigrationCoordinator;
+        use crate::data_governance::schema_registry::DatabaseId;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut coordinator =
+            MigrationCoordinator::new(dir.path().to_path_buf()).with_audit_db(None);
+        coordinator
+            .migrate_single(DatabaseId::ChatV2)
+            .expect("chat v2 migrations");
+        let db = ChatV2Database::new(dir.path()).expect("chat v2 db");
+
+        let mut session =
+            ChatSession::new("sess_note_e13s".to_string(), "analysis".to_string());
+        // 预置一个兄弟键（模拟 availableSkillsSnapshot 已冻结）
+        session.metadata = Some(serde_json::json!({
+            "availableSkillsSnapshot": "snap-bytes",
+            "chatV2Draft": { "hidden": 1 }
+        }));
+        ChatV2Repo::create_session_v2(&db, &session).expect("create session");
+
+        // 前端 saveMistakeNote 的等价序列：读 → 合并 → 写
+        let existing = ChatV2Repo::get_session_v2(&db, "sess_note_e13s")
+            .expect("get ok")
+            .expect("session exists");
+        let mut merged = existing
+            .metadata
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}));
+        merged
+            .as_object_mut()
+            .expect("object")
+            .insert(
+                "mistakeNote".to_string(),
+                serde_json::json!("2026 春期中考，物理 A 卷"),
+            );
+
+        let settings = SessionSettings {
+            title: None,
+            metadata: Some(Some(merged)),
+        };
+        update_session_settings_in_db("sess_note_e13s", &settings, &db).expect("update ok");
+
+        // 重新从库读出（证明真的落库，不只是内存返回）
+        let reloaded = ChatV2Repo::get_session_v2(&db, "sess_note_e13s")
+            .expect("reload ok")
+            .expect("session exists");
+        let meta = reloaded.metadata.expect("metadata present");
+
+        assert_eq!(meta["mistakeNote"], "2026 春期中考，物理 A 卷");
+        // 兄弟键必须存活 —— 这正是「整块替换」陷阱的回归断言
+        assert_eq!(meta["availableSkillsSnapshot"], "snap-bytes");
+        assert_eq!(meta["chatV2Draft"]["hidden"], 1);
+    }
+
     #[test]
     fn test_session_has_running_anki_blocks_reaps_stale_zombie_blocks() {
         use crate::chat_v2::types::{block_status, block_types, ChatMessage, MessageBlock};

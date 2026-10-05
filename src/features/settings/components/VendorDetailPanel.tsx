@@ -29,6 +29,11 @@ import { VendorApiKeySection } from './VendorApiKeySection';
 import { DeepSeekBalanceSection } from './DeepSeekBalanceSection';
 import { isOfficialDeepSeekVendor } from './deepSeekBalance';
 import { VendorModelFetcher, supportsModelFetching } from './VendorModelFetcher';
+import {
+  fetchModelsFromVendor,
+  resolveApiKey,
+  INVALID_VENDOR_MODEL_RESPONSE,
+} from './vendorModelService';
 import { ShadApiEditModal } from './ShadApiEditModal';
 import { OpenAICodexAccountSection } from './OpenAICodexAccountSection';
 import { useVendorSettings } from './VendorSettingsContext';
@@ -331,6 +336,8 @@ export const VendorDetailPanel: React.FC<VendorDetailPanelProps> = ({ scrollElem
   const [collapsedFamilies, setCollapsedFamilies] = useState<Set<string>>(new Set());
   // 获取模型列表：桌面/移动端统一为模型列表上方的内联卡片（不使用弹层）
   const [isModelFetcherOpen, setIsModelFetcherOpen] = useState(false);
+  // 自动拉取模型：单按钮一站式（拉取 + 全量添加），仅用于按钮 loading/禁用
+  const [autoFetchingModels, setAutoFetchingModels] = useState(false);
   // P0-5 移动端删除行内二次确认：记录当前处于「再点一次确认」态的目标（供应商 / 模型）
   const [confirmingDelete, setConfirmingDelete] = useState<
     { type: 'vendor' } | { type: 'model'; profileId: string } | null
@@ -413,6 +420,59 @@ export const VendorDetailPanel: React.FC<VendorDetailPanelProps> = ({ scrollElem
   );
   // 仅当存在 2 个及以上家族时才分组渲染；否则维持扁平避免噪声
   const shouldGroupByFamily = familyGroups.length >= 2;
+
+  // 自动拉取模型：一次点击完成「拉取 → 全量添加」，失败/空结果都必须给出可读反馈。
+  // Tauri 运行时由 Rust fetch_vendor_models 在受信边界解析凭据；浏览器预览态才读本地明文 key。
+  const handleAutoFetchModels = useCallback(async () => {
+    if (!selectedVendor || !onAddVendorModels) return;
+    if (!selectedVendor.baseUrl?.trim()) {
+      showGlobalNotification('warning', t('settings:vendor_model_fetcher.need_base_url'));
+      return;
+    }
+    setAutoFetchingModels(true);
+    try {
+      const isTauri = typeof window !== 'undefined'
+        && Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+      const resolvedKey = isTauri ? '' : await resolveApiKey(selectedVendor);
+      if (resolvedKey === null) {
+        showGlobalNotification('warning', t('settings:vendor_model_fetcher.need_api_key'));
+        return;
+      }
+
+      const fetched = await fetchModelsFromVendor(selectedVendor, resolvedKey);
+      const existingSet = new Set(
+        selectedVendorModels.map(({ profile }) => profile.model.trim().toLowerCase())
+      );
+      const newModels = fetched.filter(model => !existingSet.has(model.id.trim().toLowerCase()));
+      if (newModels.length === 0) {
+        showGlobalNotification('info', t('settings:vendor_panel.auto_fetch_models_empty'));
+        return;
+      }
+
+      await onAddVendorModels(selectedVendor, newModels.map(model => ({
+        modelId: model.id,
+        label: model.label,
+        contextWindow: model.contextWindow,
+        maxOutputTokens: model.maxOutputTokens,
+      })));
+      showGlobalNotification('success', t('settings:vendor_panel.auto_fetch_models_success', {
+        count: newModels.length,
+        defaultValue: `自动拉取模型：已添加 ${newModels.length} 个模型`,
+      }));
+    } catch (err: unknown) {
+      console.error(`[VendorDetailPanel] auto fetch models failed for ${selectedVendor.id}:`, err);
+      const raw = err instanceof Error ? err.message : t('common:error.unknown_error');
+      const error = raw === INVALID_VENDOR_MODEL_RESPONSE
+        ? t('settings:vendor_model_fetcher.invalid_response')
+        : raw;
+      showGlobalNotification('error', t('settings:vendor_panel.auto_fetch_models_failed', {
+        error,
+        defaultValue: `自动拉取模型失败：${error}`,
+      }));
+    } finally {
+      setAutoFetchingModels(false);
+    }
+  }, [onAddVendorModels, selectedVendor, selectedVendorModels, t]);
 
   // 切换供应商时重置状态
   useEffect(() => {
@@ -1044,6 +1104,23 @@ export const VendorDetailPanel: React.FC<VendorDetailPanelProps> = ({ scrollElem
                   >
                     <DownloadSimple className="h-3.5 w-3.5" />
                     {t('settings:vendor_panel.fetch_models_button')}
+                  </DsButton>
+                )}
+                {/* 自动拉取模型：一键拉取 + 全量添加（无需勾选、无二次确认）；拉取中禁用 */}
+                {!isCodexOAuthVendor && onAddVendorModels && supportsModelFetching(selectedVendor.providerType) && (
+                  <DsButton
+                    size="sm"
+                    variant="outline"
+                    className="min-h-11 flex-1 sm:min-h-0 sm:flex-none [@media(pointer:coarse)]:!min-h-11 [@media(pointer:coarse)]:!min-w-11"
+                    onClick={() => void handleAutoFetchModels()}
+                    disabled={autoFetchingModels || vendorBusy}
+                  >
+                    {autoFetchingModels
+                      ? <Spinner className="h-3.5 w-3.5 animate-spin" />
+                      : <DownloadSimple className="h-3.5 w-3.5" />}
+                    {autoFetchingModels
+                      ? t('settings:vendor_panel.auto_fetch_models_fetching')
+                      : t('settings:vendor_panel.auto_fetch_models_button')}
                   </DsButton>
                 )}
                 {/* 移动端去纯色大按钮：描边+主色文字，桌面保持实心 primary */}

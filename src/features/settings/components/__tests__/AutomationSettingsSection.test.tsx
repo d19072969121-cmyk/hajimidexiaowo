@@ -79,7 +79,7 @@ vi.mock('react-i18next', () => {
       'settings:automation.notices.deleted': `Deleted ${name}.`,
       'settings:automation.notices.enabled': `Enabled ${name}.`,
       'settings:automation.notices.disabled': `Disabled ${name}.`,
-      'settings:automation.errors.desktop_only': 'Automation management requires the Deep Student desktop app.',
+      'settings:automation.errors.desktop_only': 'Automation management requires the AI Study desktop app.',
       'settings:automation.errors.prompt_required': 'Task instructions cannot be empty.',
       'settings:automation.errors.name_required': 'Name cannot be empty.',
       'common:cancel': 'Cancel',
@@ -250,7 +250,7 @@ describe('AutomationSettingsSection', () => {
 
   it('shows the desktop-only hint and skips syncing when invoke is null', () => {
     renderSection({ invoke: null });
-    expect(screen.getByText('Automation management requires the Deep Student desktop app.')).toBeInTheDocument();
+    expect(screen.getByText('Automation management requires the AI Study desktop app.')).toBeInTheDocument();
     expect(startAutomationSyncMock).not.toHaveBeenCalled();
   });
 

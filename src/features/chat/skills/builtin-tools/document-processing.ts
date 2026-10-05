@@ -15,7 +15,7 @@ export const documentProcessingSkill: SkillDefinition = {
   description:
     '文档解析/OCR 能力组：对资源库中的 PDF、扫描件、图片主动发起解析与 OCR 管线并查询进度。当用户说"识别这个 PDF/这份扫描件读不出来/把图片里的文字提取出来"，或 resource_read 返回内容为空/提示 OCR 未完成时使用。OCR 完成后可用 resource_read 读全文、qbank_import_document 导入题库（再用 review-planning 安排复习），或用 chatanki 制卡。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://document-processing',

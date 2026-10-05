@@ -13,7 +13,7 @@ export const learningResourceSkill: SkillDefinition = {
   name: 'learning-resource',
   description: '学习资源只读发现能力组。当用户需要浏览、搜索或读取学习资料（笔记、教材、整卷、作文、翻译、知识导图）时使用；创建文件夹、移动、重命名、删除、恢复、收藏或上传资源请同时加载 dstu-tools。创建/编辑思维导图请加载 mindmap-tools。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://learning-resource',

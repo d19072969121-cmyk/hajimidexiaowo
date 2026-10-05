@@ -18,7 +18,7 @@ export const browserToolsSkill: SkillDefinition = {
   description:
     '内置浏览器操控：在用户可见的共享网页会话中打开、导航、快照、点击、输入与滚动。静态只读内容请优先用 web-fetch；登录密码由用户接管，Agent 不得代填。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://browser-tools',

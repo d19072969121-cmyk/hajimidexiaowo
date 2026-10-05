@@ -7,7 +7,7 @@ export const connectorToolsSkill: SkillDefinition = {
   name: 'connector-tools',
   description: '一等 Connector/Object Bridge：邮件、日历、会议、云盘、评论与分享。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://connector-tools',

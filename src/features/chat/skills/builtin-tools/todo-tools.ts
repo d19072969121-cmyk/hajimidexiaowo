@@ -13,7 +13,7 @@ export const todoToolsSkill: SkillDefinition = {
   name: 'todo-tools',
   description: 'AI Agent 内部任务进度管理工具，用于将复杂任务分解为可执行的子步骤并跟踪执行进度。仅用于 AI 自己的任务分解、步骤跟踪，与用户的个人待办事项无关。❗ 当用户说“帮我添加待办”“我今天有什么任务”等个人待办相关请求时，请使用 user-todo-tools 而非本工具。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://todo-tools',

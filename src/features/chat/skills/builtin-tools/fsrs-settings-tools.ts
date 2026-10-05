@@ -11,7 +11,7 @@ export const fsrsSettingsToolsSkill: SkillDefinition = {
   description:
     '读取或修改闪卡 FSRS 调度设置：每日新卡上限、每日复习上限、目标保持率、leech 阈值与处置、调度 fuzz，并附今日额度余量。回答"每天复习多少张""今天还能复习几张""帮我提高每日上限"。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://fsrs-settings-tools',

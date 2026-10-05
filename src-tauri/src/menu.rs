@@ -46,9 +46,9 @@ pub fn install_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // ----- Application menu (left of the menu bar, named after the app) -----
     let about_metadata = AboutMetadataBuilder::new()
-        .name(Some("Deep Student"))
+        .name(Some("AI Study"))
         .version(Some(env!("CARGO_PKG_VERSION")))
-        .copyright(Some("Deep Student contributors"))
+        .copyright(Some("AI Study contributors"))
         .build();
 
     let preferences = MenuItem::with_id(
@@ -61,10 +61,10 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     let app_submenu = Submenu::with_items(
         app,
-        "Deep Student",
+        "AI Study",
         true,
         &[
-            &PredefinedMenuItem::about(app, Some("About Deep Student"), Some(about_metadata))?,
+            &PredefinedMenuItem::about(app, Some("About AI Study"), Some(about_metadata))?,
             &PredefinedMenuItem::separator(app)?,
             &preferences,
             &PredefinedMenuItem::separator(app)?,
@@ -172,7 +172,7 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let documentation = MenuItem::with_id(
         app,
         "documentation",
-        "Deep Student Documentation",
+        "AI Study Documentation",
         true,
         None::<&str>,
     )?;

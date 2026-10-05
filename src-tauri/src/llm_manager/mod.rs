@@ -2118,6 +2118,53 @@ mod tests {
         assert!(merged.is_builtin);
     }
 
+    /// E13-T4 回归：无快照分支必须同步 is_image_generation。
+    ///
+    /// 该字段曾因「能力字段逐个赋值时漏掉」而被静默丢弃 —— 内置表标了
+    /// `is_image_generation: true`，用户配置 merge 后仍是 false，图像生成
+    /// 模型被当普通对话模型。本测试锁死该字段不被再次遗漏。
+    #[test]
+    fn merge_builtin_profile_user_aware_without_snapshot_syncs_image_generation_flag() {
+        let mut profiles = vec![profile("builtin-cogview", "CogView", "cogview-4", false, false)];
+        let mut builtin = profile("builtin-cogview", "CogView (官方)", "cogview-4", false, false);
+        builtin.is_image_generation = true;
+
+        LLMManager::merge_builtin_profile_user_aware(&mut profiles, builtin, None);
+
+        assert!(
+            profiles[0].is_image_generation,
+            "is_image_generation must sync from builtin in the no-snapshot branch"
+        );
+    }
+
+    /// E13-T4 回归：有快照分支（update_if_untouched!）必须覆盖 is_image_generation。
+    ///
+    /// 与前一条互补：该分支走 `update_if_untouched!` 宏列表，宏列表漏项时
+    /// 用户未改过的字段也不会被同步。
+    #[test]
+    fn merge_builtin_profile_user_aware_with_snapshot_updates_untouched_image_generation() {
+        let mut existing = profile("builtin-cogview", "CogView", "cogview-4", false, false);
+        existing.is_image_generation = false;
+
+        // 快照里该字段也是 false → 视为「用户没动过」→ 应被内置定义覆盖
+        let previous_builtin = profile("builtin-cogview", "CogView", "cogview-4", false, false);
+
+        let mut builtin = profile("builtin-cogview", "CogView (官方)", "cogview-4", false, false);
+        builtin.is_image_generation = true;
+
+        let mut profiles = vec![existing];
+        LLMManager::merge_builtin_profile_user_aware(
+            &mut profiles,
+            builtin,
+            Some(&previous_builtin),
+        );
+
+        assert!(
+            profiles[0].is_image_generation,
+            "is_image_generation must sync when untouched (update_if_untouched! list)"
+        );
+    }
+
     #[tokio::test]
     async fn get_model_profiles_drops_hidden_flag_for_new_builtin_model_without_history() {
         let temp_dir = TempDir::new().expect("create temp dir");
@@ -4107,6 +4154,7 @@ impl LLMManager {
                 existing.is_reasoning = builtin_profile.is_reasoning;
                 existing.is_embedding = builtin_profile.is_embedding;
                 existing.is_reranker = builtin_profile.is_reranker;
+                existing.is_image_generation = builtin_profile.is_image_generation;
                 existing.supports_tools = builtin_profile.supports_tools;
                 existing.supports_reasoning = builtin_profile.supports_reasoning;
                 return;
@@ -4128,6 +4176,7 @@ impl LLMManager {
             update_if_untouched!(is_reasoning);
             update_if_untouched!(is_embedding);
             update_if_untouched!(is_reranker);
+            update_if_untouched!(is_image_generation);
             update_if_untouched!(supports_tools);
             update_if_untouched!(supports_reasoning);
             update_if_untouched!(status);
@@ -5701,11 +5750,15 @@ impl LLMManager {
                             || profile.is_multimodal != builtin.is_multimodal
                             || profile.is_reasoning != builtin.is_reasoning
                             || profile.supports_reasoning != builtin.supports_reasoning
+                            || profile.is_embedding != builtin.is_embedding
+                            || profile.is_reranker != builtin.is_reranker
+                            || profile.is_image_generation != builtin.is_image_generation
                         {
                             profile.is_multimodal = builtin.is_multimodal;
                             profile.is_reasoning = builtin.is_reasoning;
                             profile.is_embedding = builtin.is_embedding;
                             profile.is_reranker = builtin.is_reranker;
+                            profile.is_image_generation = builtin.is_image_generation;
                             profile.supports_tools = builtin.supports_tools;
                             profile.supports_reasoning = builtin.supports_reasoning;
                             patched = true;

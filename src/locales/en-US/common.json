@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "Deep Student",
-    "title": "Deep Student",
+    "name": "AI Study",
+    "title": "AI Study",
     "description": "AI-powered intelligent learning assistant",
     "version": "Version",
     "default_header": "New chat"
@@ -3520,7 +3520,7 @@
     }
   },
   "welcome_onboarding": {
-    "title": "Welcome to DeepStudent",
+    "title": "Welcome to AI Study",
     "subtitle": "A local-first AI learning workbench. Your data stays on your own device.",
     "language_label": "Language / 界面语言",
     "lang_zh": "简体中文",
@@ -3671,7 +3671,7 @@
   "legal": {
     "userAgreement": {
       "title": "User Agreement & Privacy Policy",
-      "welcomeTitle": "Welcome to DeepStudent",
+      "welcomeTitle": "Welcome to AI Study",
       "welcomeDesc": "Before you begin, please read and agree to the following terms.",
       "agreementTitle": "User Agreement",
       "privacyTitle": "Privacy Policy",
@@ -3679,7 +3679,7 @@
       "agreeAndContinue": "I have read and agree",
       "mustAgree": "Please read and agree to the User Agreement and Privacy Policy first",
       "agreementContent": {
-        "intro": "DeepStudent is an AI-powered local-first learning tool. By using this software, you agree to the following terms:",
+        "intro": "AI Study is an AI-powered local-first learning tool. By using this software, you agree to the following terms:",
         "aiFeatures": "AI Features",
         "aiFeaturesDesc": "This software integrates third-party LLM API services for intelligent chat, note assistance, card generation, and more. AI-generated content is for reference only and does not constitute professional advice.",
         "dataProcessing": "Data Processing",
@@ -3709,7 +3709,7 @@
       "sections": {
         "overview": {
           "title": "Overview",
-          "content": "DeepStudent is a local-first learning tool committed to protecting your privacy. This policy explains how we collect, use, and protect your data."
+          "content": "AI Study is a local-first learning tool committed to protecting your privacy. This policy explains how we collect, use, and protect your data."
         },
         "localStorage": {
           "title": "Local Data Storage",
@@ -3725,7 +3725,7 @@
         },
         "cloudSync": {
           "title": "Cloud Sync (Optional)",
-          "content": "You can choose to sync data to your own configured cloud storage. Android supports WebDAV only; desktop builds also support S3-compatible storage and experimental FTP. This feature is disabled by default and only transmits data when you explicitly configure and trigger it. Data is not sent to Deep Student servers."
+          "content": "You can choose to sync data to your own configured cloud storage. Android supports WebDAV only; desktop builds also support S3-compatible storage and experimental FTP. This feature is disabled by default and only transmits data when you explicitly configure and trigger it. Data is not sent to AI Study servers."
         },
         "noTracking": {
           "title": "No Behavior Tracking",
@@ -3771,7 +3771,7 @@
         "llmData": "AI Request Data",
         "llmDataDesc": "When using AI features, conversation content is sent to your configured LLM API provider",
         "syncData": "Sync Data (Optional)",
-        "syncDataDesc": "If cloud sync is enabled, data goes only to storage you configured (WebDAV on Android; desktop also supports S3-compatible storage and experimental FTP), not to Deep Student servers",
+        "syncDataDesc": "If cloud sync is enabled, data goes only to storage you configured (WebDAV on Android; desktop also supports S3-compatible storage and experimental FTP), not to AI Study servers",
         "sentryData": "Error Reports (Optional)",
         "sentryDataDesc": "If enabled, anonymous crash information is sent to the error reporting service",
         "crossBorderNote": "Cross-Border Transfer Notice",
@@ -4026,7 +4026,30 @@
     "mistakePreview": "Mistakes",
     "loadFailed": "Failed to load mistakes: {{msg}}",
     "searchTags": "Search tags…",
-    "noTagMatch": "No matching tags"
+    "noTagMatch": "No matching tags",
+    "timeFilterLabel": "Time",
+    "timeAll": "All",
+    "timeThisMonth": "This month",
+    "timeLastMonth": "Last month",
+    "timeLast3Months": "Last 3 months",
+    "timeThisYear": "This year",
+    "timeUnknown": "Unknown date",
+    "groupByMonth": "Group by month",
+    "groupNone": "No grouping",
+    "noteLabel": "Note",
+    "notePlaceholder": "e.g. March exam, Math paper Q18",
+    "noteHint": "Record the exam date, which paper, etc.",
+    "noteSave": "Save",
+    "noteCancel": "Cancel",
+    "noteEdit": "Edit note",
+    "noteAdd": "Add note",
+    "noteSaved": "Note saved",
+    "noteSaveFailed": "Failed to save note: {{msg}}",
+    "noteEmpty": "No note yet",
+    "noteTooLong": "Note is limited to {{max}} characters",
+    "removeTag": "Remove tag {{tag}}",
+    "tagPlaceholder": "Tag name",
+    "openSettingsForDiagnosis": "If this keeps failing, check data status in Settings"
   },
   "capture": {
     "title": "Capture",

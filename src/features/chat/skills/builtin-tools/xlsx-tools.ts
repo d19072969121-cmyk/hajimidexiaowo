@@ -19,7 +19,7 @@ export const xlsxToolsSkill: SkillDefinition = {
     'XLSX 电子表格读写编辑能力组，支持结构化读取、表格提取、XLSX 文件生成、round-trip 编辑、单元格编辑和文本替换。' +
     '当用户需要分析/创建/编辑 Excel 电子表格时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://xlsx-tools',

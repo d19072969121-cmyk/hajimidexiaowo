@@ -106,7 +106,7 @@ pub const HEARTBEAT_OK_SENTINEL: &str = "HEARTBEAT_OK";
 /// 默认心跳检查清单 prompt（v1 硬编码模板，后续可做成用户可编辑文件）。
 /// 注意：只引用 headless 白名单内的工具（见 `headless::headless_allowed_tools`）。
 pub const DEFAULT_HEARTBEAT_PROMPT: &str = "\
-你是 Deep Student 的后台心跳检查代理。请依次检查以下清单（只使用可用的只读工具，工具不可用则跳过该项）：\n\
+你是 AI Study 的后台心跳检查代理。请依次检查以下清单（只使用可用的只读工具，工具不可用则跳过该项）：\n\
 1. 用 builtin-user_todo_get_summary 检查今天到期或已逾期的待办事项；\n\
 2. 用 builtin-qbank_list（include_stats=true）留意最近 3 天没有练习记录、或错误率偏高需要复习的题库/错题本；\n\
 3. 如需补充上下文，可用 builtin-unified_search 搜索相关学习记录。\n\
@@ -2467,19 +2467,19 @@ fn notification_success_body(
 ) -> String {
     match (lang, session_id) {
         (NotificationLang::Zh, Some(session_id)) if summary.is_empty() => {
-            format!("已完成，打开 Deep Student 查看会话（{}）", session_id)
+            format!("已完成，打开 AI Study 查看会话（{}）", session_id)
         }
         (NotificationLang::Zh, Some(_)) => {
-            format!("{}\n打开 Deep Student 查看完整会话", summary)
+            format!("{}\n打开 AI Study 查看完整会话", summary)
         }
         (NotificationLang::En, Some(session_id)) if summary.is_empty() => {
             format!(
-                "Completed. Open Deep Student to view the session ({}).",
+                "Completed. Open AI Study to view the session ({}).",
                 session_id
             )
         }
         (NotificationLang::En, Some(_)) => {
-            format!("{}\nOpen Deep Student to view the full session.", summary)
+            format!("{}\nOpen AI Study to view the full session.", summary)
         }
         (_, None) => summary.to_string(),
     }
@@ -2496,12 +2496,12 @@ fn truncate_prompt_for_notification(prompt: &str, lang: NotificationLang) -> Str
     let preview: String = prompt.chars().take(100).collect();
     let truncated = prompt.chars().count() > 100;
     match lang {
-        NotificationLang::Zh if truncated => format!("{}… 打开 Deep Student 执行此任务", preview),
-        NotificationLang::Zh => format!("{} 打开 Deep Student 执行此任务", preview),
+        NotificationLang::Zh if truncated => format!("{}… 打开 AI Study 执行此任务", preview),
+        NotificationLang::Zh => format!("{} 打开 AI Study 执行此任务", preview),
         NotificationLang::En if truncated => {
-            format!("{}… Open Deep Student to run this task.", preview)
+            format!("{}… Open AI Study to run this task.", preview)
         }
-        NotificationLang::En => format!("{} Open Deep Student to run this task.", preview),
+        NotificationLang::En => format!("{} Open AI Study to run this task.", preview),
     }
 }
 

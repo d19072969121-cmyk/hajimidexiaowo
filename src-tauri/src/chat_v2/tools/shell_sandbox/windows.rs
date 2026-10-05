@@ -1343,7 +1343,7 @@ fn revoke_policy(granted: &[PathBuf], protected: &[ProtectedPath], sid: PSID) {
 
 fn create_profile(name: &str, capabilities: &[SID_AND_ATTRIBUTES]) -> Result<Profile, String> {
     let name_wide = wide(name);
-    let display_name = wide("Deep Student local shell");
+    let display_name = wide("AI Study local shell");
     let description = wide("Ephemeral AppContainer for an approved local shell command");
     let mut sid: PSID = null_mut();
     let result = unsafe {

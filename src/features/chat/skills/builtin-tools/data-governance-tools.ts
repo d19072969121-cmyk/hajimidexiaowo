@@ -21,7 +21,7 @@ export const dataGovernanceToolsSkill: SkillDefinition = {
   description:
     '查看本地备份与同步状态，创建完整备份并轮询后台任务，或使用 Settings 已配置的安全云存储执行同步。恢复、导入、清库和任何云凭据操作有意不开放：用户要恢复备份时应引导其到 设置→数据治理 页面自行操作，AI 无此权限。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://data-governance-tools',

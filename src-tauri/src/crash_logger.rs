@@ -132,7 +132,7 @@ fn write_crash_log(
     }
 
     let mut buffer = String::new();
-    buffer.push_str("=== Deep Student 崩溃日志 ===\n");
+    buffer.push_str("=== AI Study 崩溃日志 ===\n");
     buffer.push_str(&format!("时间: {}\n", now.to_rfc3339()));
     buffer.push_str(&format!(
         "版本: {} (Build {}, {})\n",

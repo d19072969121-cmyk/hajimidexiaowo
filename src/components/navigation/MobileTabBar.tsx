@@ -45,9 +45,9 @@ import { cn } from '@/lib/utils';
 import { useMobileLayoutSafe } from '@/components/layout/MobileLayoutContext';
 import {
   StudyBooksIcon,
+  StudyCameraIcon,
   StudyCardsIcon,
   StudyChatIcon,
-  StudyMagicWandIcon,
   StudySettingsIcon,
 } from '@/components/icons/StudySidebarIcons';
 import { TAB_IDS, type TabId } from '@/config/tabNavigation';
@@ -202,7 +202,8 @@ export function useTabBarHideClaim(input: TabBarHideClaimInput): void {
 /** TabId → 图标。本轮 P0 只需要 4 个既有图标 + home 复用 chat 图标。 */
 const TAB_ICON: Record<TabId, React.ElementType> = {
   home: StudyChatIcon,
-  study: StudyMagicWandIcon,
+  // 拍题：用相机图标（原魔法棒 StudyMagicWandIcon 表意不清，用户明确要求换成相机）
+  study: StudyCameraIcon,
   review: StudyCardsIcon,
   media: StudyBooksIcon,
   // 注意：me 曾与 study 同用 StudyMagicWandIcon，导致底栏出现重复图案。

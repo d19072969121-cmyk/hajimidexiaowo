@@ -4,6 +4,7 @@ import { getErrorMessage } from '@/utils/errorUtils';
 import { sessionManager } from '../core/session/sessionManager';
 import { SESSION_LIST_PAGE_SIZE } from '../core/constants';
 import { createSessionWithDefaults } from '../core/session/createSessionWithDefaults';
+import { ANALYSIS_FAMILY_MODES } from '../plugins/modes/modeFamily';
 import type { ChatSession } from '../types/session';
 import type { SessionGroup } from '../types/group';
 
@@ -84,8 +85,14 @@ const SIDEBAR_REFRESH_DEBOUNCE_MS = 120;
  *
  * 排除规则由**调用方**决定：错题本（useMistakeBook）不传该参数，
  * 因此仍能查到 analysis 会话。
+ *
+ * ⚠️ **必须用族常量，不能写死 `['analysis']`**：拍题家族含 `analysis` 与
+ *    `solver`（E8 的拍题解题 agent）。写死字符串会让 solver 静默漏排除 →
+ *    solver 拍题会话混进首页常规会话列表，而错题本（走族判据）也收录它，
+ *    同一会话两处归属不一致。这与 `ChatV2Page.tsx:579-582` 的族判据属同一
+ *    语义，必须共用同一份单一真相源（`modeFamily.ts`）。
  */
-const SIDEBAR_EXCLUDE_MODES = ['analysis'];
+const SIDEBAR_EXCLUDE_MODES = [...ANALYSIS_FAMILY_MODES];
 
 export function useSidebarSessionData(): SidebarSessionData {
   const [sessions, setSessions] = useState<ChatSession[]>([]);

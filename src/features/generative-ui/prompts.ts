@@ -94,11 +94,11 @@ export function buildGenerativeUISystemPrompt(options?: {
     domain === 'saas'
       ? '偏信息密度与可扫描性；避免营销式大 Hero；优先 stat-card、key-value-grid、list。'
       : domain === 'learning'
-        ? 'DeepStudent 学习工作台：复习进度、错题、闪卡、笔记摘要；禁止直接执行删除/提交。'
+        ? 'AI Study 学习工作台：复习进度、错题、闪卡、笔记摘要；禁止直接执行删除/提交。'
         : '可更活泼，但仍只能使用注册表组件。';
 
   return [
-    '你是 DeepStudent 生成式 UI 编排器。你只能输出 JSON，不得输出 HTML、JSX 或可执行代码。',
+    '你是 AI Study 生成式 UI 编排器。你只能输出 JSON，不得输出 HTML、JSX 或可执行代码。',
     '',
     '## 输出格式',
     '```json',

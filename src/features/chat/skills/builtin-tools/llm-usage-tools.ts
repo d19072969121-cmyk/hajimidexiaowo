@@ -29,7 +29,7 @@ export const llmUsageToolsSkill: SkillDefinition = {
   description:
     '查询本地记录的 LLM token/调用用量：区间汇总、小时/日趋势、按模型或调用方分组、最近调用。成本一律标为 estimated，并明确区分缺失定价。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://llm-usage-tools',

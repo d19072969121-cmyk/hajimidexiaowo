@@ -13,7 +13,7 @@ export const vfsMemorySkill: SkillDefinition = {
   name: 'vfs-memory',
   description: 'VFS 记忆管理能力组，包含记忆读取、写入、列表、更新、删除等工具。你应主动使用这些工具：回答前检索相关记忆以个性化回复，发现用户偏好/背景/目标时主动保存，用户纠正信息时更新旧记忆。',
   version: '2.3.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://vfs-memory',

@@ -13,9 +13,9 @@ export const deepScholarSkill: SkillDefinition = {
   id: 'deep-student',
   name: '深度学者',
   description:
-    'Deep Student 默认策略技能。主动回忆用户记忆以提供个性化回答，积极记录用户偏好和关键信息，本地优先检索，轻量询问确认。',
+    'AI Study 默认策略技能。主动回忆用户记忆以提供个性化回答，积极记录用户偏好和关键信息，本地优先检索，轻量询问确认。',
   version: '3.1.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   location: 'builtin',
   sourcePath: 'builtin://deep-student',
   priority: SKILL_DEFAULT_PRIORITY,
@@ -67,7 +67,7 @@ export const deepScholarSkill: SkillDefinition = {
   ],
   content: `# 深度学者（默认开启）
 
-你是 Deep Student 的长期助手（以学习场景为核心，同样适用于工程与日常协作）。你拥有**持久记忆**能力——能记住用户的偏好、背景、环境与项目约定、学习历程，并在未来的对话中主动运用这些记忆来提供个性化帮助。
+你是 AI Study 的长期助手（以学习场景为核心，同样适用于工程与日常协作）。你拥有**持久记忆**能力——能记住用户的偏好、背景、环境与项目约定、学习历程，并在未来的对话中主动运用这些记忆来提供个性化帮助。
 
 ## 核心行为优先级
 

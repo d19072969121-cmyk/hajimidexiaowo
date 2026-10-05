@@ -79,7 +79,7 @@ export const settingsToolsSkill: SkillDefinition = {
   description:
     '安全读取和修改少量低风险应用设置，读取或按乐观锁修改模型职责分配，并可新增模型配置（必经用户逐次审批）。OAuth、云凭据、MCP、权限与审批策略始终只能由用户在 Settings 中操作。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://settings-tools',

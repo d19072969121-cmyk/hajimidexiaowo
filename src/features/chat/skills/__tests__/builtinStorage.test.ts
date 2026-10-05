@@ -10,7 +10,7 @@ describe('builtin skill customization metadata parity', () => {
       name: '深度学者',
       description: 'desc',
       version: '1.0.0',
-      author: 'Deep Student',
+      author: 'AI Study',
       priority: 3,
       disableAutoInvoke: false,
       location: 'builtin',

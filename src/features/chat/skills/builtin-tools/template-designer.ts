@@ -15,7 +15,7 @@ export const templateDesignerSkill: SkillDefinition = {
   description:
     '制卡模板的设计与管理工具。支持列举、查看、校验、创建、更新、分叉、预览、删除模板和设置默认模板，帮助用户高效定制符合需求的 Anki 制卡模板。适用于自定义模板设计、内置模板调整、模板结构校验与自动化回归。',
   version: '1.3.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://template-designer',

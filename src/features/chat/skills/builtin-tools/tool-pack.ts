@@ -14,7 +14,7 @@ export const toolPackSkill: SkillDefinition = {
   name: 'tool-pack',
   description: 'ToolPack 并行工具包能力，允许在一次调用中并行执行多个内置工具并汇总结果。当需要同时查询多个数据源时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 1,
   location: 'builtin',
   sourcePath: 'builtin://tool-pack',

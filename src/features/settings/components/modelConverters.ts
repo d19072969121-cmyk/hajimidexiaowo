@@ -433,6 +433,16 @@ export const inferProviderTypeFromBaseUrl = (baseUrl?: string | null): string | 
   if (lowerBaseUrl.includes('xiaomimimo.com')) {
     return 'mimo';
   }
+  // 免 Key 通道：三者都不需要 API Key，靠 base_url 识别后自动选中对应 provider_type
+  if (lowerBaseUrl.includes('api.llmtech.eu')) {
+    return 'llmtech';
+  }
+  if (lowerBaseUrl.includes('api.kilo.ai')) {
+    return 'kilo';
+  }
+  if (lowerBaseUrl.includes('text.pollinations.ai')) {
+    return 'pollinations';
+  }
 
   return undefined;
 };

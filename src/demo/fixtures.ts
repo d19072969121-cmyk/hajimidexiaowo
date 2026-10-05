@@ -126,7 +126,7 @@ function makeFixture(opts: {
 // ============================================================================
 
 const DEMO_TEMPLATE_BASE = {
-  author: 'Deep Student',
+  author: 'AI Study',
   version: '1.0',
   generation_prompt: '',
   preview_front: '',
@@ -244,7 +244,7 @@ export const DEFAULT_FOLLOW_UP: DemoBlocks = [
     delay: 350,
     content: `这里的交互内容来自预设学习材料。你可以打开 PDF 页码引用、查看章节导图、翻阅卡片，以及展开会话底部的学习产物。
 
-下载 Deep Student 桌面版并连接所选模型后，就可以带入自己的教材、照片与笔记，继续提问、整理资料和准备练习。`,
+下载 AI Study 桌面版并连接所选模型后，就可以带入自己的教材、照片与笔记，继续提问、整理资料和准备练习。`,
   },
 ];
 

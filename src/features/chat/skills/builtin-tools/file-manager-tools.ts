@@ -21,7 +21,7 @@ const itemSchema: JsonSchemaProperty = {
 export const fileManagerToolsSkill: SkillDefinition = {
   id: 'file-manager-tools', name: 'file-manager-tools',
   description: 'Preview-bound batch rename, move, soft-delete, restore, and explicit text format conversion inside the read-write workspace with item-level OCC.',
-  version: '1.0.0', author: 'Deep Student', priority: 8, location: 'builtin',
+  version: '1.0.0', author: 'AI Study', priority: 8, location: 'builtin',
   sourcePath: 'builtin://file-manager-tools', isBuiltin: true, disableAutoInvoke: false, skillType: 'standalone',
   content: `# File manager
 

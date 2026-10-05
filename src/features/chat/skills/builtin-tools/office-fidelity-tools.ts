@@ -6,7 +6,7 @@ export const officeFidelityToolsSkill: SkillDefinition = {
   description:
     '只读检查授权 DOCX/XLSX/PPTX/PDF 的高保真特性，输出可审计证据哈希与完成门；不执行宏、不解密、不声称编辑器会保留未支持特性。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 9,
   location: 'builtin',
   sourcePath: 'builtin://office-fidelity-tools',
@@ -16,7 +16,7 @@ export const officeFidelityToolsSkill: SkillDefinition = {
   content: `# Office Fidelity Preflight
 
 - 编辑已有 DOCX/XLSX/PPTX 或交付 PDF 前，先调用 builtin-office_fidelity_inspect。
-- 输入必须是带 managed locator 或 Deep Student VFS provider ref 的授权 TaskObjectHandle；禁止裸主机路径。
+- 输入必须是带 managed locator 或 AI Study VFS provider ref 的授权 TaskObjectHandle；禁止裸主机路径。
 - 检查结果区分 detector supported、只读检查保持的 preserved，以及当前编辑链不能保证的 unsupported。
 - 宏、数字签名、修订、批注、域、脚注、公式、命名范围、数据验证、图表、透视、外链、母版、备注、动画、PDF 表单/签名/附件/加密均进入完成门。
 - 绝不执行宏。检测到宏或签名时默认拒绝自动编辑；未来只有实际源编辑链接入检查结果并显式使用 macro_policy=strip 时才可剥离宏，且必须标注签名失效。

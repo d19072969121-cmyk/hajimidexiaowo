@@ -23,7 +23,7 @@ export async function buildDemoMaterials(): Promise<Blob> {
     ].join('\n\n');
     zip.file(`提问与资料/${fixture.meta.title}.md`, content);
   }
-  zip.file('从这里开始.md', `# 在 Deep Student 中继续学习
+  zip.file('从这里开始.md', `# 在 AI Study 中继续学习
 
 这个材料包包含三张高数习题图片、一份 60 页的数据并行教学样本、英文阅读原文，以及六组提问与来源摘录。PDF 与习题图片由项目编写，供练习和功能体验使用。第 45、47、52 页对应数据并行、同步训练与通信优化。
 
@@ -53,7 +53,7 @@ export async function downloadDemoMaterials(): Promise<void> {
   const url = URL.createObjectURL(await buildDemoMaterials());
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = 'DeepStudent-学习材料.zip';
+  anchor.download = 'AIStudy-学习材料.zip';
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

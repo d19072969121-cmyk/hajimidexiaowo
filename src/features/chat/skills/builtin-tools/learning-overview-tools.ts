@@ -22,7 +22,7 @@ export const learningOverviewToolsSkill: SkillDefinition = {
   description:
     '只读汇总指定区间的学习活动与番茄钟，并附题库、FSRS/SM-2 的调用时当前快照，回答本周学了什么、学了多久以及近期专注趋势。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://learning-overview-tools',

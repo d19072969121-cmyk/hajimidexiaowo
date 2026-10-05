@@ -689,7 +689,7 @@ async fn skill_export_tap_impl(
         let mut readme_lines: Vec<String> = vec![
             "# Skills Tap".to_string(),
             String::new(),
-            "Exported from Deep Student. Push this directory to a GitHub repository,".to_string(),
+            "Exported from AI Study. Push this directory to a GitHub repository,".to_string(),
             "then anyone can browse & install these skills via a skill source (tap) URL."
                 .to_string(),
             String::new(),

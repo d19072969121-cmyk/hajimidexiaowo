@@ -69,6 +69,9 @@ const providerTypeOptions = [
   { value: 'mistral', labelKey: 'settings:vendor_modal.providers.mistral', defaultLabel: 'Mistral' },
   { value: 'openrouter', labelKey: 'settings:vendor_modal.providers.openrouter', defaultLabel: 'OpenRouter' },
   { value: 'ollama', labelKey: 'settings:vendor_modal.providers.ollama', defaultLabel: 'Ollama' },
+  { value: 'pollinations', labelKey: 'settings:vendor_modal.providers.pollinations', defaultLabel: 'Pollinations (No Key)' },
+  { value: 'llmtech', labelKey: 'settings:vendor_modal.providers.llmtech', defaultLabel: 'LLM Tech (No Key)' },
+  { value: 'kilo', labelKey: 'settings:vendor_modal.providers.kilo', defaultLabel: 'Kilo Gateway (No Key)' },
 ];
 
 const protocolImpliesResponsesSupport = (protocol?: ApiProtocol | null) => protocol === 'openai_responses';

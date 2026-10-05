@@ -15,7 +15,7 @@ export const goalToolsSkill: SkillDefinition = {
   name: 'goal-tools',
   description: '会话目标管理工具：创建跨轮次持续推进的会话目标（系统自动续跑直到完成）、更新目标状态、查询目标进度与预算消耗。仅在用户明确提出需要多步推进的目标时使用。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 5,
   location: 'builtin',
   sourcePath: 'builtin://goal-tools',

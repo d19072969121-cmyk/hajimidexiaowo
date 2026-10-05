@@ -10,7 +10,7 @@ export const taskGovernanceToolsSkill: SkillDefinition = {
   name: 'task-governance-tools',
   description: '任务审计导出与可验证的 lineage forget。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 9,
   location: 'builtin',
   sourcePath: 'builtin://task-governance-tools',

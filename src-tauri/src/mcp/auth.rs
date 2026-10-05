@@ -722,7 +722,7 @@ impl McpAuthManager {
         {
             (id, params.client_secret.clone())
         } else if let Some(reg) = endpoints.registration.as_ref() {
-            self.dynamic_client_register(reg, &redirect_uri, "Deep Student MCP")
+            self.dynamic_client_register(reg, &redirect_uri, "AI Study MCP")
                 .await?
         } else {
             return Err(McpError::AuthenticationError(
@@ -1634,7 +1634,7 @@ mod tests {
             .dynamic_client_register(
                 "https://as.test/oauth/register",
                 "http://127.0.0.1:9/auth/callback",
-                "Deep Student MCP",
+                "AI Study MCP",
             )
             .await
             .expect("DCR");

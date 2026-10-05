@@ -28,6 +28,25 @@ const aboutActionLabelClassName =
 const aboutActionTrailingIconClassName =
   'ml-auto h-3 w-3 flex-shrink-0 text-muted-foreground/40';
 
+/** 上游项目（Deep Student）仓库地址，关于页「派生自」与官方链接共用。 */
+const DEEP_STUDENT_REPO_URL = 'https://github.com/helixnow/deep-student';
+
+/**
+ * 技术合作伙伴致谢卡片，顺序即渲染顺序：
+ * SiliconFlow（算力/模型）→ DSHA（本项目开发工具）→ Deep Student（上游二创来源）。
+ */
+const partnerCards: Array<{
+  key: string;
+  Logo?: React.FC<{ alt?: string; className?: string }>;
+  markText?: string;
+  titleFallback: string;
+  altFallback: string;
+}> = [
+  { key: 'siliconflow', Logo: SiliconFlowLogo, titleFallback: 'SiliconFlow', altFallback: 'Powered by SiliconFlow' },
+  { key: 'dsha', markText: 'DSHA', titleFallback: 'DSHA', altFallback: 'Developed with DSHA' },
+  { key: 'deepstudent', markText: 'Deep Student', titleFallback: 'Deep Student', altFallback: 'Based on Deep Student' },
+];
+
 type AboutActionRowProps = {
   icon: React.FC<{ className?: string }>;
   label: string;
@@ -381,8 +400,20 @@ export const AboutTab: React.FC = () => {
             </SettingRow>
             <SettingRow title={t('acknowledgements.developer.fields.platforms')}>
               <span className="text-sm text-foreground/90">
-                {t('acknowledgements.developer.values.platforms', 'Windows / macOS / iPadOS / Android')}
+                {t('acknowledgements.developer.values.platforms', 'Android')}
               </span>
+            </SettingRow>
+            <SettingRow title={t('acknowledgements.developer.fields.basedOn', 'Based On')}>
+              <a
+                data-about-action-row
+                href={DEEP_STUDENT_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-foreground/90 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] rounded-sm"
+              >
+                {t('acknowledgements.developer.values.basedOn', 'A derivative work of Deep Student')}
+                <ArrowSquareOut size={12} className="h-3 w-3 flex-shrink-0 text-muted-foreground/40" />
+              </a>
             </SettingRow>
             </div></div>
           </div>
@@ -393,8 +424,8 @@ export const AboutTab: React.FC = () => {
           <div className="rounded-2xl bg-muted px-3 py-3 sm:px-4"><div className="space-y-px">
             {[
               { icon: Globe, label: t('acknowledgements.links.website'), href: 'https://www.deepstudent.cn' },
-              { icon: GithubLogo, label: t('acknowledgements.links.github', 'GitHub'), href: 'https://github.com/helixnow/deep-student' },
-              { icon: Bug, label: t('acknowledgements.links.issues'), href: 'https://github.com/helixnow/deep-student/issues' },
+              { icon: GithubLogo, label: t('acknowledgements.links.github', 'GitHub'), href: DEEP_STUDENT_REPO_URL },
+              { icon: Bug, label: t('acknowledgements.links.issues'), href: `${DEEP_STUDENT_REPO_URL}/issues` },
             ].map((item) => (
               <AboutActionRow
                 key={item.href}
@@ -414,20 +445,36 @@ export const AboutTab: React.FC = () => {
 
         <div className="mt-8">
           <GroupTitle title={t('acknowledgements.partners.title')} />
-          <div className="rounded-2xl bg-muted px-3 py-3 sm:px-4"><div className="flex items-start justify-between gap-4 px-1 py-1.5">
-            <div className="min-w-0 flex-1 max-w-3xl">
-              <h4 className="text-sm font-medium text-foreground/90">
-                {t('acknowledgements.partners.cards.siliconflow.title', 'SiliconFlow')}
-              </h4>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground/70">
-                {t('acknowledgements.partners.cards.siliconflow.description')}
-              </p>
-            </div>
-            <SiliconFlowLogo
-              alt={t('acknowledgements.partners.cards.siliconflow.alt', 'Powered by SiliconFlow')}
-              className="mt-0.5 h-6 w-auto shrink-0 opacity-65"
-            />
-          </div></div>
+          <div className="rounded-2xl bg-muted px-3 py-3 sm:px-4">
+            {partnerCards.map((card, index) => (
+              <div
+                key={card.key}
+                className={`flex items-start justify-between gap-4 px-1 py-1.5${index > 0 ? ' mt-3 border-t border-border/40 pt-4' : ''}`}
+              >
+                <div className="min-w-0 flex-1 max-w-3xl">
+                  <h4 className="text-sm font-medium text-foreground/90">
+                    {t(`acknowledgements.partners.cards.${card.key}.title`, card.titleFallback)}
+                  </h4>
+                  <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground/70">
+                    {t(`acknowledgements.partners.cards.${card.key}.description`)}
+                  </p>
+                </div>
+                {card.Logo ? (
+                  <card.Logo
+                    alt={t(`acknowledgements.partners.cards.${card.key}.alt`, card.altFallback)}
+                    className="mt-0.5 h-6 w-auto shrink-0 opacity-65"
+                  />
+                ) : (
+                  <span
+                    aria-label={t(`acknowledgements.partners.cards.${card.key}.alt`, card.altFallback)}
+                    className="mt-0.5 shrink-0 text-sm font-semibold tracking-wide text-muted-foreground/65"
+                  >
+                    {card.markText}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mt-8">

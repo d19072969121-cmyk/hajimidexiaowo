@@ -16,7 +16,7 @@ export const insightRecallSkill: SkillDefinition = {
   description:
     '灵感召回能力：当用户当前问题与其历史「灵感卡」（自己卡住后总结的方法）情境相似时，唤起用户自己的方法而非直接给答案。支持按披露阶梯逐级升级。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://insight-recall',

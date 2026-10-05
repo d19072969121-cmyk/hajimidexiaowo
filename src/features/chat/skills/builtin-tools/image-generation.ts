@@ -11,7 +11,7 @@ export const imageGenerationSkill: SkillDefinition = {
   name: 'image-generation',
   description: '图片生成能力。用于生成学习插图、概念图、知识卡片配图、题目配图、封面图等视觉材料。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 8,
   location: 'builtin',
   sourcePath: 'builtin://image-generation',

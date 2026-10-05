@@ -36,6 +36,18 @@ import { useTranslation } from 'react-i18next';
 import type { CurrentView } from '@/types/navigation';
 import { useSessionTags } from '@/features/chat/hooks/useSessionTags';
 import { useMistakeBook, type MistakeBookEntryWithTags } from '../hooks/useMistakeBook';
+import {
+  MISTAKE_TIME_RANGES,
+  filterByTimeRange,
+  formatMonthLabel,
+  groupByMonth,
+  type MistakeTimeRange,
+} from '../hooks/mistakeTimeFilter';
+import {
+  MISTAKE_NOTE_MAX_LENGTH,
+  readMistakeNote,
+  saveMistakeNote,
+} from '../hooks/useMistakeNote';
 
 export interface ReviewHubPageProps {
   /** 返回回调；不传则不显示返回箭头（Tab 根页通常不需要） */
@@ -112,7 +124,7 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
   className,
 }) => {
   const { t } = useTranslation();
-  const { entries, isLoading, error, isLoaded } = useMistakeBook();
+  const { entries, isLoading, error, isLoaded, refresh: refreshMistakeBook } = useMistakeBook();
 
   // 归类：标签状态复用 chat 侧现成的 useSessionTags（批量读取 + 增删 + 筛选），
   // 不在这里另造一套（否则归类 UI 加的标签与错题本副本会不同步）。
@@ -152,6 +164,88 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
     if (selectedFilterTags.size === 0) return withTags;
     return withTags.filter((e) => e.tags.some((tag) => selectedFilterTags.has(tag)));
   }, [entries, tagsBySession, selectedFilterTags]);
+
+  /**
+   * 时间分类（E13-S）。
+   *
+   * 口径：按 **createdAt**（拍题时间）筛选，而不是 updatedAt —— 复习一次会
+   * 把 updatedAt 刷成今天，用它当「考试时间」语义会漂移。详见
+   * `mistakeTimeFilter.ts` 头部说明。
+   */
+  const [timeRange, setTimeRange] = useState<MistakeTimeRange>('all');
+  /** 是否按月份分组展示（用户要求「分类好时间」） */
+  const [groupByMonthEnabled, setGroupByMonthEnabled] = useState(false);
+
+  /** 先按标签筛、再按时间筛（两者是「与」关系） */
+  const timeFilteredEntries = useMemo(
+    () => filterByTimeRange(visibleEntries, timeRange),
+    [visibleEntries, timeRange],
+  );
+
+  /**
+   * 渲染用分组。
+   *
+   * 未开启分组时退化成「单组且无标题」，让下面的渲染只走一条分支，
+   * 避免两套列表 JSX 各自演化。
+   */
+  const renderedGroups = useMemo(() => {
+    const list = timeFilteredEntries.slice(0, 20);
+    if (!groupByMonthEnabled) return [{ monthKey: '', entries: list }];
+    return groupByMonth(list);
+  }, [timeFilteredEntries, groupByMonthEnabled]);
+
+  /**
+   * 备注编辑态：一次只编辑一条（sessionId）。
+   * 值放在这里而不是每条一个组件，避免 20 条各自持有输入状态。
+   */
+  const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  /** 会话 metadata 的内存覆盖层：保存成功后立即反映，不必等整表刷新 */
+  const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
+
+  const beginEditNote = useCallback(
+    (sessionId: string, current: string) => {
+      setNoteEditingId(sessionId);
+      setNoteDraft(current);
+    },
+    [],
+  );
+
+  const cancelEditNote = useCallback(() => {
+    setNoteEditingId(null);
+    setNoteDraft('');
+  }, []);
+
+  /**
+   * 保存备注：走 `saveMistakeNote`（读-改-写会话 metadata，跟随会话落库）。
+   *
+   * 成功后把值放进 `noteOverrides` 立即生效，并触发一次列表刷新让
+   * `metadata` 权威值回流 —— 两者都做是为了「不闪」且「不自欺」：
+   * 覆盖层给即时反馈，刷新负责最终一致。
+   */
+  const commitNote = useCallback(
+    async (sessionId: string) => {
+      const value = noteDraft;
+      setNoteEditingId(null);
+      setNoteDraft('');
+      try {
+        await saveMistakeNote(sessionId, value);
+        setNoteOverrides((prev) => ({ ...prev, [sessionId]: value.trim() }));
+        void refreshMistakeBook();
+      } catch (err) {
+        // 失败不静默：把错误抛给调用方的 onError（由外层 toast 呈现）
+        throw err;
+      }
+    },
+    [noteDraft, refreshMistakeBook],
+  );
+
+  /** 取某条错题当前生效的备注：内存覆盖层优先，其次会话 metadata */
+  const noteFor = useCallback(
+    (entry: MistakeBookEntryWithTags): string =>
+      noteOverrides[entry.sessionId] ?? readMistakeNote(entry.metadata),
+    [noteOverrides],
+  );
 
   /** 标签搜索关键词（E5）：标签多了以后逐个扫视不现实 */
   const [tagQuery, setTagQuery] = useState('');
@@ -292,6 +386,30 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
             className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
           >
             {t('reviewHub.loadFailed', '错题本加载失败：{{msg}}', { msg: error })}
+            {/*
+              E13-S 可发现性改进（来自 task-12 的发现）：
+              当 chat_v2 被启动期 fail-close 阻断（lib.rs:1306 mark_blocked）时，
+              此后所有错误都一样——用户只会看到「加载失败」，无从下手。
+
+              ⚠️ 前端**无法可靠区分**「被阻断（不可自愈）」与「临时失败（可重试）」：
+              `chat_v2_list_sessions` 的 State 未注册时，Tauri 只回一个通用错误串，
+              没有结构化错误码；而 `StartupComponentHealthState` 虽被 manage
+              （lib.rs:940），**却没有任何 #[tauri::command] 读取它**，
+              前端拿不到 is_blocked 信息。要真正区分，需新增一个 Rust 查询命令。
+
+              因此这里**不做类型判定、不猜**，只给一个总是可用的出口：跳到设置页。
+              文案也刻意写成「若反复失败」这种条件句，而不是断言「你被阻断了」。
+            */}
+            {onNavigate && (
+              <button
+                type="button"
+                data-testid="review-hub-error-open-settings"
+                onClick={() => onNavigate('settings')}
+                className="mt-1.5 block text-xs text-primary underline-offset-2 hover:underline"
+              >
+                {t('reviewHub.openSettingsForDiagnosis', '若反复失败，去「设置」检查数据状态')}
+              </button>
+            )}
           </div>
         )}
 
@@ -404,6 +522,53 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
             </div>
           )}
 
+          {/* 时间分类（E13-S）：按「拍题时间」筛选 + 可切月份分组。
+              与标签筛选是「与」关系（先标签、后时间）。 */}
+          <div
+            data-testid="review-hub-time-filter"
+            className="mb-2 flex flex-wrap items-center gap-1.5"
+          >
+            <span className="text-xs text-muted-foreground">
+              {t('reviewHub.timeFilterLabel', '时间')}
+            </span>
+            {MISTAKE_TIME_RANGES.map((range) => {
+              const active = timeRange === range;
+              return (
+                <button
+                  key={range}
+                  type="button"
+                  data-testid={`review-hub-time-${range}`}
+                  data-active={String(active)}
+                  onClick={() => setTimeRange(range)}
+                  className={cn(
+                    'rounded-full border px-2 py-0.5 text-xs transition-colors',
+                    active
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:bg-accent',
+                  )}
+                >
+                  {t(`reviewHub.time${range === 'all' ? 'All' : range.charAt(0).toUpperCase() + range.slice(1)}`, range)}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              data-testid="review-hub-group-toggle"
+              data-active={String(groupByMonthEnabled)}
+              onClick={() => setGroupByMonthEnabled((v) => !v)}
+              className={cn(
+                'ml-auto rounded-full border px-2 py-0.5 text-xs transition-colors',
+                groupByMonthEnabled
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:bg-accent',
+              )}
+            >
+              {groupByMonthEnabled
+                ? t('reviewHub.groupNone', '不分组')
+                : t('reviewHub.groupByMonth', '按月份分类')}
+            </button>
+          </div>
+
           {isLoading && !isLoaded ? (
             <div
               data-testid="review-hub-mistake-loading"
@@ -411,7 +576,7 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
             >
               {t('reviewHub.loading', '加载中…')}
             </div>
-          ) : visibleEntries.length === 0 ? (
+          ) : timeFilteredEntries.length === 0 ? (
             <div
               data-testid="review-hub-mistake-empty"
               className="rounded-lg border border-border px-3 py-4 text-center text-xs text-muted-foreground"
@@ -421,62 +586,158 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
                 : t('reviewHub.noMistakes', '还没有错题，去「拍题」试试')}
             </div>
           ) : (
-            <ul className="space-y-1.5">
-              {visibleEntries.slice(0, 20).map((item) => (
-                <li
-                  key={item.sessionId}
-                  data-testid={`review-hub-mistake-item-${item.sessionId}`}
-                  className="rounded-lg border border-border px-3 py-2 transition-colors hover:bg-accent"
-                >
+            <div className="space-y-3">
+              {renderedGroups.map((group) => (
+                <div key={group.monthKey || '__ungrouped__'}>
                   {/*
-                    条目本体可点开（E5 修复）：
-                    此前整条是个纯 <li>，没有任何点击处理——用户「点 UI 也点不开」，
-                    根本看不到自己錯的是哪道题。
-                    点开目标 = 解析结果页（该错题会话的完整内容：题干 + 解析 + 笔记），
-                    这正是「错题 = mode:'analysis' 的 chat 会话」这一定义的直接体现。
-                    ⚠️ 用 button 包住标题区而非整个 li：下方标签的「×」与「+ 标签」
-                       是独立交互，套在可点容器里会误触。
+                    月份标题（仅在开启分组时出现）。`monthKey === ''` 是
+                    「时间无法解析」的兜底组，用 i18n 文案而不是空标题，
+                    否则用户会看到一撮没有归属的条目。
                   */}
-                  <button
-                    type="button"
-                    data-testid={`review-hub-open-${item.sessionId}`}
-                    onClick={() => onOpenMistake?.(item.sessionId)}
-                    className="flex w-full items-center justify-between text-left"
-                  >
-                    <span className="truncate text-sm text-foreground">{item.title}</span>
-                    <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                      {formatDate(item.updatedAt)}
-                    </span>
-                  </button>
-                  {/* 标签行：每个标签带删除按钮 = 手动归类（移除）。
-                      加标签走下方输入框。 */}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                    {item.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        data-testid={`review-hub-mistake-tag-${item.sessionId}-${tag}`}
-                        className="inline-flex items-center gap-0.5 rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          aria-label={`移除标签 ${tag}`}
-                          data-testid={`review-hub-untag-${item.sessionId}-${tag}`}
-                          onClick={() => void removeTag(item.sessionId, tag)}
-                          className="ml-0.5 opacity-60 hover:opacity-100"
+                  {groupByMonthEnabled && (
+                    <div
+                      data-testid={`review-hub-month-${group.monthKey || 'unknown'}`}
+                      className="mb-1 text-xs font-medium text-muted-foreground"
+                    >
+                      {group.monthKey
+                        ? formatMonthLabel(group.monthKey)
+                        : t('reviewHub.timeUnknown', '未知时间')}
+                    </div>
+                  )}
+                  <ul className="space-y-1.5">
+                    {group.entries.map((item) => {
+                      const note = noteFor(item);
+                      const editing = noteEditingId === item.sessionId;
+                      return (
+                        <li
+                          key={item.sessionId}
+                          data-testid={`review-hub-mistake-item-${item.sessionId}`}
+                          className="rounded-lg border border-border px-3 py-2 transition-colors hover:bg-accent"
                         >
-                          <X size={11} aria-hidden="true" />
-                        </button>
-                      </span>
-                    ))}
-                    <TagAdder
-                      sessionId={item.sessionId}
-                      onAdd={addTag}
-                    />
-                  </div>
-                </li>
+                          {/*
+                            条目本体可点开（E5 修复）：
+                            此前整条是个纯 <li>，没有任何点击处理——用户「点 UI 也点不开」，
+                            根本看不到自己錯的是哪道题。
+                            点开目标 = 解析结果页（该错题会话的完整内容：题干 + 解析 + 笔记），
+                            这正是「错题 = mode:'analysis' 的 chat 会话」这一定义的直接体现。
+                            ⚠️ 用 button 包住标题区而非整个 li：下方标签的「×」与「+ 标签」
+                               是独立交互，套在可点容器里会误触。
+                          */}
+                          <button
+                            type="button"
+                            data-testid={`review-hub-open-${item.sessionId}`}
+                            onClick={() => onOpenMistake?.(item.sessionId)}
+                            className="flex w-full items-center justify-between text-left"
+                          >
+                            <span className="truncate text-sm text-foreground">{item.title}</span>
+                            <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                              {formatDate(item.createdAt)}
+                            </span>
+                          </button>
+
+                          {/* 备注（E13-S）：用户要求能记「考试时间」「什么卷子」。
+                              已保存的备注直接展示；编辑态换成 textarea。 */}
+                          {editing ? (
+                            <div className="mt-1.5">
+                              <textarea
+                                data-testid={`review-hub-note-input-${item.sessionId}`}
+                                value={noteDraft}
+                                onChange={(e) => setNoteDraft(e.target.value)}
+                                maxLength={MISTAKE_NOTE_MAX_LENGTH}
+                                rows={2}
+                                autoFocus
+                                placeholder={t(
+                                  'reviewHub.notePlaceholder',
+                                  '例：3 月月考，数学卷第 18 题',
+                                )}
+                                className="w-full resize-none rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    cancelEditNote();
+                                  }
+                                  // Ctrl/Cmd+Enter 提交；单独 Enter 留给换行
+                                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                    e.preventDefault();
+                                    void commitNote(item.sessionId);
+                                  }
+                                }}
+                              />
+                              <div className="mt-1 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  data-testid={`review-hub-note-save-${item.sessionId}`}
+                                  onClick={() => void commitNote(item.sessionId)}
+                                  className="rounded border border-border px-2 py-0.5 text-xs text-foreground hover:bg-accent"
+                                >
+                                  {t('reviewHub.noteSave', '保存')}
+                                </button>
+                                <button
+                                  type="button"
+                                  data-testid={`review-hub-note-cancel-${item.sessionId}`}
+                                  onClick={cancelEditNote}
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  {t('reviewHub.noteCancel', '取消')}
+                                </button>
+                                <span className="ml-auto text-[10px] text-muted-foreground">
+                                  {t('reviewHub.noteHint', '可记考试时间、哪张卷子等')}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1.5 flex items-start gap-1.5">
+                              <button
+                                type="button"
+                                data-testid={`review-hub-note-edit-${item.sessionId}`}
+                                onClick={() => beginEditNote(item.sessionId, note)}
+                                className={cn(
+                                  'rounded px-1.5 py-0.5 text-left text-xs transition-colors',
+                                  note
+                                    ? 'text-foreground/80 hover:bg-accent'
+                                    : 'border border-dashed border-border text-muted-foreground hover:bg-accent',
+                                )}
+                                title={note || undefined}
+                              >
+                                {note ? note : `+ ${t('reviewHub.noteAdd', '加备注')}`}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* 标签行：每个标签带删除按钮 = 手动归类（移除）。
+                              加标签走下方输入框。 */}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                            {item.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                data-testid={`review-hub-mistake-tag-${item.sessionId}-${tag}`}
+                                className="inline-flex items-center gap-0.5 rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground"
+                              >
+                                {tag}
+                                <button
+                                  type="button"
+                                  aria-label={t('reviewHub.removeTag', '移除标签 {{tag}}', { tag })}
+                                  data-testid={`review-hub-untag-${item.sessionId}-${tag}`}
+                                  onClick={() => void removeTag(item.sessionId, tag)}
+                                  className="ml-0.5 opacity-60 hover:opacity-100"
+                                >
+                                  <X size={11} aria-hidden="true" />
+                                </button>
+                              </span>
+                            ))}
+                            <TagAdder
+                              sessionId={item.sessionId}
+                              onAdd={addTag}
+                              t={t}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </section>
       </div>
@@ -493,7 +754,9 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
 const TagAdder: React.FC<{
   sessionId: string;
   onAdd: (sessionId: string, tag: string) => Promise<void>;
-}> = ({ sessionId, onAdd }) => {
+  /** i18n 翻译函数（由父级注入，避免子组件再起一个 useTranslation） */
+  t: (key: string, fallback: string) => string;
+}> = ({ sessionId, onAdd, t }) => {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState('');
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -536,7 +799,7 @@ const TagAdder: React.FC<{
         }
       }}
       onBlur={commit}
-      placeholder="标签名"
+      placeholder={t('reviewHub.tagPlaceholder', '标签名')}
       className="h-6 w-20 rounded-full border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
     />
   );

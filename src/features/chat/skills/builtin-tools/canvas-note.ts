@@ -13,7 +13,7 @@ export const canvasNoteSkill: SkillDefinition = {
   name: 'canvas-note',
   description: '智能笔记能力组，包含笔记读取、追加、替换、创建、列表、搜索、标签更新、软删除以及笔记库 zip 导入等工具。当用户需要查看、编辑、创建、管理笔记或导入笔记库备份 zip 时使用；若用户要求“展示/演示/让我看你操作”等可见操作，必须同时加载 workbench-tools，先打开并聚焦已有笔记，再按授权执行可见编辑。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 3,
   location: 'builtin',
   sourcePath: 'builtin://canvas-note',

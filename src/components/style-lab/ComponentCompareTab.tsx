@@ -162,7 +162,7 @@ function ButtonCompareSection() {
 // ─── Form Controls 对比 ────────────────────────────────────────
 
 function FormControlsCompareSection() {
-  const [inputValue, setInputValue] = useState('DeepStudent');
+  const [inputValue, setInputValue] = useState('AI Study');
   const [textareaValue, setTextareaValue] = useState('多行文本示例\n支持垂直拉伸。');
   const [switchChecked, setSwitchChecked] = useState(true);
   const [checkboxChecked, setCheckboxChecked] = useState(true);

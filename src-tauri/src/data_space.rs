@@ -650,7 +650,7 @@ fn inspect_startup_candidate(id: &str, path: &Path) -> std::io::Result<StartupRe
         valid_core_database_filenames,
         selectable,
         selection_block_reason: (!selectable)
-            .then(|| "未检测到 Deep Student 核心数据库".to_string()),
+            .then(|| "未检测到 AI Study 核心数据库".to_string()),
         recommended: false,
         recommendation_reason: String::new(),
     })

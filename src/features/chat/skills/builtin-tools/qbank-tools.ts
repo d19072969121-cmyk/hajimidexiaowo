@@ -13,7 +13,7 @@ export const qbankToolsSkill: SkillDefinition = {
   name: 'qbank-tools',
   description: '智能题目集完整能力组：建题与编辑、刷题与错题、限时练习和模拟考、检索分析、每日练习、收藏与组卷。当用户需要管理题目、练习、考试、分析薄弱知识点或生成试卷时使用。',
   version: '2.2.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://qbank-tools',

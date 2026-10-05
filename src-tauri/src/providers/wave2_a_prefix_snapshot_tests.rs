@@ -35,7 +35,7 @@ use serde_json::{json, Value};
 fn system_message() -> Value {
     json!({
         "role": "system",
-        "content": "你是 Deep Student 的学习助手。回答保持简洁，需要资料时优先调用工具检索。"
+        "content": "你是 AI Study 的学习助手。回答保持简洁，需要资料时优先调用工具检索。"
     })
 }
 

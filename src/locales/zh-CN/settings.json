@@ -34,14 +34,14 @@
     "save_failed": "听写设置保存失败。",
     "not_configured": "未配置",
     "shortcut_title": "听写快捷键",
-    "shortcut_description": "选择 DeepStudent 内全局快捷键的行为方式。听写内容仍然只会插入到当前已支持的输入框，并且不会自动发送。",
+    "shortcut_description": "选择 AI Study 内全局快捷键的行为方式。听写内容仍然只会插入到当前已支持的输入框，并且不会自动发送。",
     "trigger_mode_title": "触发方式",
     "trigger_mode_description": "按住快捷键讲话，或按一次切换。听写结果只插入到光标处，不会自动发送。",
     "diagnostics_title": "诊断",
     "hotkey": "快捷键",
     "max_duration_ms": "最长录音（毫秒）",
     "hold_mode_title": "按住听写快捷键",
-    "hold_mode_description": "在 DeepStudent 内任意已支持输入区域按住快捷键开始听写，松开后停止。",
+    "hold_mode_description": "在 AI Study 内任意已支持输入区域按住快捷键开始听写，松开后停止。",
     "hold_mode_short": "按住",
     "toggle_mode_title": "按一次开始，再按一次停止",
     "toggle_mode_description": "使用同一个快捷键切换听写状态，适合更长的免按住听写。",
@@ -52,7 +52,7 @@
     "quick_actions_description": "当听写没有按预期工作时，可以直接跳到模型分配、API 凭据和使用统计。",
     "dictionary_title": "自定义词典",
     "dictionary_description": "希望优先识别的词或短语，每行一个。",
-    "dictionary_placeholder": "Photosynthesis\nAnkylosing spondylitis\nDeepStudent",
+    "dictionary_placeholder": "Photosynthesis\nAnkylosing spondylitis\nAI Study",
     "dictionary_count": "{{count}} 条",
     "dictionary_hint": "提供方支持时自动并入 ASR 提示词。",
     "history_title": "最近听写",
@@ -396,6 +396,11 @@
   },
   "vendor_panel": {
     "add_vendor_button": "添加供应商",
+    "auto_fetch_models_button": "自动拉取模型",
+    "auto_fetch_models_fetching": "正在拉取模型…",
+    "auto_fetch_models_success": "已自动添加 {{count}} 个模型",
+    "auto_fetch_models_empty": "未拉取到可添加的新模型（当前可用模型均已添加）",
+    "auto_fetch_models_failed": "自动拉取模型失败：{{error}}",
     "add_model_button": "添加模型",
     "list_title": "供应商列表",
     "empty_vendors": "尚未创建任何供应商",
@@ -589,6 +594,9 @@
       "mistral": "Mistral",
       "openrouter": "OpenRouter",
       "ollama": "Ollama",
+      "pollinations": "Pollinations（免 Key）",
+      "llmtech": "LLM Tech（免 Key）",
+      "kilo": "Kilo 网关（免 Key）",
       "custom": "自定义"
     },
     "base_url_label": "接口地址",
@@ -941,7 +949,7 @@
       "background_disabled": "已关闭后台运行。"
     },
     "errors": {
-      "desktop_only": "自动化管理需要 Deep Student 桌面应用。",
+      "desktop_only": "自动化管理需要 AI Study 桌面应用。",
       "invalid_response": "自动化列表返回了无效数据。",
       "version_conflict": "该自动化在编辑期间已发生变化，现已刷新为最新版本。请确认后重新编辑。",
       "name_required": "名称不能为空。",
@@ -1023,7 +1031,7 @@
       "cta": "新建档案"
     },
     "errors": {
-      "desktop_only": "子代理档案管理需要 Deep Student 桌面应用。",
+      "desktop_only": "子代理档案管理需要 AI Study 桌面应用。",
       "reveal_failed": "无法打开档案目录，请检查目录是否存在。",
       "name_required": "请填写档案名称",
       "name_invalid": "名称仅允许小写字母、数字和连字符（不超过 64 个字符）",
@@ -1064,7 +1072,7 @@
   },
   "system_authorization": {
     "title": "系统授权",
-    "description": "管理 Deep Student 在电脑上运行所需的系统权限。只在实际使用相关功能时申请。",
+    "description": "管理 AI Study 在电脑上运行所需的系统权限。只在实际使用相关功能时申请。",
     "request": "去授权",
     "open_settings": "打开设置",
     "refresh": "刷新状态",
@@ -1079,12 +1087,12 @@
     "notifications": {
       "title": "系统通知",
       "description": "允许番茄钟、待办提醒和后台自动化在需要时发送系统通知。",
-      "denied_hint": "系统通知权限已被拒绝，请在系统设置中允许 Deep Student 发送通知。"
+      "denied_hint": "系统通知权限已被拒绝，请在系统设置中允许 AI Study 发送通知。"
     },
     "microphone": {
       "title": "麦克风",
       "description": "允许语音输入在你主动开始听写时采集音频。",
-      "denied_hint": "麦克风权限已被拒绝，请在系统设置中允许 Deep Student 使用麦克风。"
+      "denied_hint": "麦克风权限已被拒绝，请在系统设置中允许 AI Study 使用麦克风。"
     },
     "files": {
       "title": "文件与目录",
@@ -1212,13 +1220,13 @@
   "acknowledgements": {
     "openSource": {
       "title": "开源项目致谢",
-      "description": "DeepStudent 依托以下成熟的开源生态快速发展，感谢所有社区长期的维护与创新。",
+      "description": "AI Study 依托以下成熟的开源生态快速发展，感谢所有社区长期的维护与创新。",
       "openDialog": "查看致谢名单",
       "closeDialog": "关闭",
       "projectLicense": "项目许可证",
       "thirdPartyLicense": "第三方许可证",
-      "projectLicenseDescription": "DeepStudent 使用的 GNU Affero 通用公共许可证全文。",
-      "thirdPartyLicenseDescription": "随 DeepStudent 分发的组件许可证与版权归属声明。",
+      "projectLicenseDescription": "AI Study 使用的 GNU Affero 通用公共许可证全文。",
+      "thirdPartyLicenseDescription": "随 AI Study 分发的组件许可证与版权归属声明。",
       "backToAcknowledgements": "返回致谢名单",
       "loadingLicenses": "正在加载许可证...",
       "licenseLoadError": "无法加载许可证文本。",
@@ -1242,8 +1250,18 @@
       "cards": {
         "siliconflow": {
           "title": "SiliconFlow",
-          "description": "提供多模态与推理模型服务，保障 DeepStudent 在国产算力生态中的高效稳定运行。",
+          "description": "提供多模态与推理模型服务，保障 AI Study 在国产算力生态中的高效稳定运行。",
           "alt": "Powered by SiliconFlow"
+        },
+        "dsha": {
+          "title": "DSHA",
+          "description": "AI Study 使用 DSHA（DeepSeek Harness for Android）在安卓设备上完成开发与构建。",
+          "alt": "Developed with DSHA"
+        },
+        "deepstudent": {
+          "title": "Deep Student",
+          "description": "AI Study 是 Deep Student 的二创项目，感谢上游开源工作奠定的基础。",
+          "alt": "Based on Deep Student"
         }
       }
     },
@@ -1253,10 +1271,12 @@
         "developer": "开发者",
         "version": "版本",
         "license": "许可证",
-        "platforms": "平台支持"
+        "platforms": "平台支持",
+        "basedOn": "派生自"
       },
       "values": {
-        "platforms": "Windows / macOS / iPadOS / Android"
+        "platforms": "Android",
+        "basedOn": "基于 Deep Student 二创"
       }
     },
     "links": {

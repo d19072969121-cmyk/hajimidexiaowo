@@ -72,7 +72,7 @@ export const textbookPdfToolsSkill: SkillDefinition = {
   description:
     '教材 PDF 批注与页图工具。分页读取、添加、删除或更新真实书签和划线高亮，并读取经过尺寸与体积限制的真实 PDF 页图。适合“第 12 页加书签/划黄”“看看这一页图像”等场景。',
   version: '1.0.0',
-  author: 'Deep Student',
+  author: 'AI Study',
   priority: 7,
   location: 'builtin',
   sourcePath: 'builtin://textbook-pdf-tools',

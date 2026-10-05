@@ -81,6 +81,9 @@ export const ComposerTextarea: React.FC<ComposerTextareaProps> = ({
 }) => {
   // 🔧 IME 合成态追踪：防止 WKWebView 中文输入法重复追加文本
   const isComposingRef = useRef(false);
+  // 🔧 记录最后一次已写入 store 的 DOM 值，供 compositionend 去重
+  // （受控组件下 store 与 DOM 必须始终一致，重复写入会让受控值漂移）
+  const composedTextRef = useRef('');
   // 🔧 Safari/WebKit 时序修复：compositionend 先于确认 Enter 的 keydown 触发，
   // 该 keydown 的 isComposing 已为 false，会把「确认候选词」误判为「发送」。
   // 标记 compositionend 后的同一轮事件循环，期间的 Enter 一律视为 IME 确认键。
@@ -156,9 +159,13 @@ export const ComposerTextarea: React.FC<ComposerTextareaProps> = ({
               compositionJustEndedRef.current = false;
               compositionEndTimerRef.current = null;
             }, 0);
-            // 合成结束时用最终值同步 store，确保不丢字
+            // 合成结束：store 已在 onChange 中实时跟随，这里只在值确实变化时补一次同步，
+            // 兼顾 WKWebView 偶发不派发最后一个 input 事件的时序（去重避免重复追加）。
             const composedTarget = e.target as HTMLTextAreaElement;
-            onInputChange(composedTarget.value);
+            if (composedTarget.value !== composedTextRef.current) {
+              composedTextRef.current = composedTarget.value;
+              onInputChange(composedTarget.value);
+            }
             onCaretPosChange(composedTarget.selectionStart);
             setTimeout(() => {
               adjustTextareaHeight();
@@ -166,10 +173,13 @@ export const ComposerTextarea: React.FC<ComposerTextareaProps> = ({
             }, 0);
           }}
           onChange={(e) => {
-            // 🔧 IME 合成期间跳过 store 更新，仅移动端 WKWebView 需要（桌面端受控组件会阻止输入）
-            if (!isComposingRef.current || !isMobile) {
-              onInputChange(e.target.value);
-            }
+            // 🔧 受控组件必须无条件回写 store：DOM 值一旦与 value prop 不一致，
+            // React 会在本次 onChange 返回时同步把 DOM 回滚到旧 prop —— 组合期间
+            // 跳过写入 = 用户敲的字当场被抹掉（E13-D 实测）。
+            // 原 WKWebView「重复追加」保护改由 composedTextRef 去重承担，见 onCompositionEnd。
+            const nextValue = e.target.value;
+            composedTextRef.current = nextValue;
+            onInputChange(nextValue);
             setTimeout(() => {
               adjustTextareaHeight();
               scrollCaretIntoView();

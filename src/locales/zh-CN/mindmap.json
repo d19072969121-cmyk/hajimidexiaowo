@@ -65,7 +65,7 @@
     "spatialNavigation": "画布方向键按空间邻接",
     "descriptionFirstLine": "描述只预览首行",
     "classicKeymapActive": "经典大纲键位：⌘Enter 完成，Shift+Enter 描述，⌘[/] 聚焦；Alt+[/] 折叠。",
-    "deepStudentKeymapActive": "Deep Student 默认键位：⌘Enter 加子节点，Shift+Enter 换行；Alt+[/] 折叠。"
+    "deepStudentKeymapActive": "AI Study 默认键位：⌘Enter 加子节点，Shift+Enter 换行；Alt+[/] 折叠。"
   },
   "export": {
     "title": "导出",

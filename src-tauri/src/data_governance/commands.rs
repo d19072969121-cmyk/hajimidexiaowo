@@ -1070,7 +1070,7 @@ pub fn data_governance_get_migration_diagnostic_report(
     let mut report = String::with_capacity(4096);
 
     // --- 头部 ---
-    let _ = writeln!(report, "=== Deep Student 迁移诊断报告 ===");
+    let _ = writeln!(report, "=== AI Study 迁移诊断报告 ===");
     let _ = writeln!(report, "时间: {}", chrono::Utc::now().to_rfc3339());
     let _ = writeln!(
         report,
