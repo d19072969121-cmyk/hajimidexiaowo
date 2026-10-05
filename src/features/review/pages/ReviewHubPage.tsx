@@ -213,8 +213,29 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
    * 入口卡改为可点，点击**滚动到预览区并聚焦**（而非导航到别的视图）。
    * 不改成跳转到独立页，是因为预览区就在本页、且带本页的标签筛选状态 ——
    * 跳走反而割裂。真正的「独立错题详情页」已由 `mistake-detail` 承担（点条目进）。
+   *
+   * ## ⚠️ E9 二次修正（用户仍反馈「点了没反应」）
+   * 首版用 `scrollIntoView`，有两个失效场景：
+   *   ① 页面本就不长、预览区**已在屏幕内** → 无可见位移 → 用户认为「没反应」
+   *   ② 真正的滚动容器是**内层** `overflow-y-auto` 的 div（下方 line ~252），
+   *      部分 WebView 里 `scrollIntoView` 找不到正确的滚动祖先 → 完全不动
+   * 故改为**显式设置内层容器的 scrollTop**（不依赖祖先推断），
+   * 并叠加一次短暂高亮 —— 即使位移为 0，用户也能看到「它确实响应了」。
    */
   const mistakePreviewRef = React.useRef<HTMLElement>(null);
+  /** 内层滚动容器（真正被滚动的元素） */
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  /** 高亮脉冲：给「无位移」场景一个可见反馈 */
+  const [previewPulse, setPreviewPulse] = useState(0);
+  /** 高亮中（点击后短暂为 true，随后自动消退，避免一直亮着） */
+  const [previewHighlight, setPreviewHighlight] = useState(false);
+
+  useEffect(() => {
+    if (!previewHighlight) return;
+    // 与 CSS 的 duration-300 对齐；稍长一点确保人眼能捕捉到
+    const timer = window.setTimeout(() => setPreviewHighlight(false), 600);
+    return () => window.clearTimeout(timer);
+  }, [previewHighlight, previewPulse]);
 
   const handleEntryClick = useCallback(
     (entry: HubEntry) => {
@@ -223,7 +244,21 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
         return;
       }
       // view === null：本页内展开的项（目前只有错题本）→ 滚到预览区
-      mistakePreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const container = scrollContainerRef.current;
+      const target = mistakePreviewRef.current;
+      if (container && target) {
+        // 相对容器的偏移：用两者 rect 之差 + 当前 scrollTop。
+        // 减去一点余量（8px），避免标题正好贴上边框。
+        const delta = target.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        const next = container.scrollTop + delta - 8;
+        container.scrollTo({ top: Math.max(0, next), behavior: 'smooth' });
+      } else {
+        // 兜底：拿不到容器时退回原实现（桌面端浏览器语义正确）
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      // 无论是否产生位移都给反馈（用户反馈的核心是「看不出响应」）
+      setPreviewPulse((v) => v + 1);
+      setPreviewHighlight(true);
     },
     [onNavigate],
   );
@@ -249,7 +284,7 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
         <h1 className="flex-1 truncate text-base font-medium text-foreground">{headerTitle}</h1>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         {/* 加载失败：可重试的错误条，不把「失败」伪装成「没有错题」 */}
         {error && (
           <div
@@ -312,7 +347,17 @@ export const ReviewHubPage: React.FC<ReviewHubPageProps> = ({
         </div>
 
         {/* 错题本：筛选条 + 条目（标签可增删，即「手动归类」） */}
-        <section ref={mistakePreviewRef} className="mt-4" data-testid="review-hub-mistake-preview">
+        <section
+          ref={mistakePreviewRef}
+          className={cn(
+            'mt-4 rounded-lg transition-colors duration-300',
+            // 点击入口卡后短暂高亮：即使预览区已在屏内（无位移），
+            // 用户也能看到「它确实响应了」。
+            previewHighlight && 'ring-2 ring-primary/40',
+          )}
+          data-testid="review-hub-mistake-preview"
+          data-pulse={previewPulse}
+        >
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-xs font-medium text-muted-foreground">
               {t('reviewHub.mistakePreview', '错题本')}

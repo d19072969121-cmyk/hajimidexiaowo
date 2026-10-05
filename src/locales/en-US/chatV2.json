@@ -1232,6 +1232,7 @@
     "switchingSession": "Switching session...",
     "deleteSessionFailed": "Failed to delete session",
     "createSessionFailed": "Failed to create session. Please try again.",
+    "newSessionAlreadyReady": "You're already in a new chat — just start typing",
     "createAnalysisSessionFailed": "Failed to create analysis session. Please try again.",
     "loadSessionsFailed": "Failed to load sessions. Refresh and try again.",
     "loadMoreSessionsFailed": "Failed to load more sessions. Please try again.",

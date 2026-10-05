@@ -4040,7 +4040,16 @@
     "emptyTitle": "还没有知识卡片",
     "emptyDesc": "把零散的知识点记成卡片，需要时随手翻看",
     "new": "新建知识卡片",
-    "openReview": "进入间隔重复复习"
+    "openReview": "进入间隔重复复习",
+    "newDialogTitle": "新建知识卡片",
+    "newDialogDesc": "知识卡片目前由 AI 从你的对话与错题中沉淀。回到主页，直接让 AI 帮你新建即可。",
+    "aiNew": "AI 新建",
+    "aiCreateHint": "可以在主页让 AI 新建知识卡片",
+    "loadFailed": "知识卡片加载失败",
+    "retry": "重试",
+    "loading": "读取中…",
+    "noMatch": "没有匹配的卡片",
+    "uncategorized": "未分类"
   },
   "weakPoints": {
     "title": "易错点",

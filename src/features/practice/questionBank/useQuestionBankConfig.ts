@@ -142,6 +142,14 @@ export interface UseQuestionBankConfigResult {
   ) => void;
   /** 持久化到后端 */
   save: () => Promise<void>;
+  /**
+   * 清空配置并**立即持久化**（不需要再点保存）。
+   *
+   * ⚠️ 为什么不复用 `save`：`save` 写的是 `currentConfig` 的在途快照，
+   *    而清空是一个「已决定」的终态动作，语义上应当直接落盘，
+   *    否则用户点「清除」后若直接退出，后端仍是旧配置（一刷新又回来了）。
+   */
+  clear: () => Promise<void>;
 }
 
 export function useQuestionBankConfig(): UseQuestionBankConfigResult {
@@ -233,5 +241,36 @@ export function useQuestionBankConfig(): UseQuestionBankConfigResult {
     }
   }, []);
 
-  return { config, isLoaded, isSaving, error, setProvider, setCredential, setCredentials, save };
+  const clear = useCallback(async () => {
+    if (!mountedRef.current) return;
+    dirtyRef.current = true;
+    setIsSaving(true);
+    setError(null);
+    // 先广播清空（UI 立刻反映），再把空配置落盘。
+    emit(() => DEFAULT_QUESTION_BANK_CONFIG);
+    try {
+      await invoke('save_setting', {
+        key: QUESTION_BANK_CONFIG_KEY,
+        value: JSON.stringify(DEFAULT_QUESTION_BANK_CONFIG),
+      });
+      loaded = true;
+    } catch (err) {
+      if (mountedRef.current) setError(getErrorMessage(err));
+      return;
+    } finally {
+      if (mountedRef.current) setIsSaving(false);
+    }
+  }, []);
+
+  return {
+    config,
+    isLoaded,
+    isSaving,
+    error,
+    setProvider,
+    setCredential,
+    setCredentials,
+    save,
+    clear,
+  };
 }

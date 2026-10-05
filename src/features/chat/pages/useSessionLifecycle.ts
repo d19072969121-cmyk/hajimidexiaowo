@@ -146,6 +146,34 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
     const currentDraftScope = getCurrentHiddenDraftSessionScope();
     const targetDraftScope = getDraftSessionScope('chat', groupId ?? null);
     if (currentDraftScope === targetDraftScope) {
+      // ⚠️ E9（用户反馈 ⑥「首页 +新对话 点了没反应」）：
+      //     App 启动时会**自动建一个隐藏草稿会话**，所以用户点「+新对话」时
+      //     scope 往往已经相同 —— 原实现直接 return，**界面上什么都没发生**，
+      //     用户只能理解成「按钮坏了」。
+      //
+      //     正确语义：此时用户想要的不是「再建一个会话」（草稿会话本来就是空的、
+      //     复用的），而是「让我开始输入新一轮」。故改为：
+      //       ① 聚焦输入框（有可见反馈）
+      //       ② 仅当当前草稿**已有内容或消息**时才提示，避免每次点击都弹通知
+      //          （空草稿是无感的，反复弹通知反而吵）。
+      const draftId = currentSessionId;
+      if (draftId) {
+        requestChatInputFocus(draftId);
+        const store = sessionManager.get(draftId);
+        // 字段名以 `core/types/store.ts` 的 ChatStore 为准：
+        //   消息是 `messageMap` + `messageOrder`（**没有** `messages` 这个字段）
+        const hasContent = (() => {
+          if (!store) return false;
+          const state = store.getState();
+          return state.messageOrder.length > 0;
+        })();
+        if (hasContent) {
+          showGlobalNotification(
+            'info',
+            t('page.newSessionAlreadyReady', '已在新对话中，请直接输入'),
+          );
+        }
+      }
       return;
     }
 
@@ -160,7 +188,7 @@ export function useSessionLifecycle(deps: UseSessionLifecycleDeps) {
     } finally {
       setIsLoading(false);
     }
-  }, [getCurrentHiddenDraftSessionScope, getOrCreateHiddenDraftSession, setCurrentSessionId, setIsLoading, t]);
+  }, [getCurrentHiddenDraftSessionScope, getOrCreateHiddenDraftSession, setCurrentSessionId, setIsLoading, t, currentSessionId]);
 
   // P1-06: 创建分析模式会话
   // 打开文件对话框让用户选择图片，然后创建 analysis 模式会话

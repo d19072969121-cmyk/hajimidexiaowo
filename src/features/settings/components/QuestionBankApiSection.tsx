@@ -6,16 +6,22 @@
  *
  * ## 交互规格（用户原话逐条落地）
  * - 「未配置时在旁边要显示『去配置』这个按钮」→ 未配置：按钮可点，进入配置
- * - 「配置了就显示已配置且按钮无效」→ 已配置：按钮 disabled，文案「已配置」
+ * - 「配置了就显示已配置且按钮无效」→ 已配置：按钮文案「已配置」
  * - 「点击打开题库 api 配置」→ 点按钮展开下方的来源选择 + 凭据表单
+ *
+ * ## ⚠️ E9 修正：已配置**不再禁用**（用户后续提出）
+ * 原实现严格照「配置了就禁用」做，结果是**配完即锁死**：填错来源、想换 key、
+ * 想升级套餐全部做不到。用户实测反馈「题库配置后没有修改按钮」。
+ * 现改为：已配置时按钮**仍可点**，点击展开面板即可修改；想要清空则用
+ * 面板内的「清除配置」。即 disabled 只保留「加载中」这一种情形。
  *
  * ## 为什么状态用「去配置 / 已配置」而不是开关
  * 这是**配置完整性**的表达，不是启用开关：填齐凭据即为已配置。
- * 用 disabled 而非隐藏，是为了让「已配置」这一事实可见。
+ * 按钮始终可见，是为了让「已配置」这一事实可见。
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Check, ExternalLink, Loader2 } from 'lucide-react';
+import { Check, ExternalLink, Loader2, Trash2 } from 'lucide-react';
 
 import { DsButton } from '@/components/ui/DsButton';
 import { cn } from '@/utils/cn';
@@ -44,9 +50,12 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
     setCredential,
     setCredentials,
     save,
+    clear,
   } = useQuestionBankConfig();
 
   const [expanded, setExpanded] = useState(false);
+  /** 「清除配置」的二次确认（E9）——清掉的是加密存储的凭据，必须防误触 */
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const ready = useMemo(() => isQuestionBankReady(config), [config]);
   const activeMeta = useMemo(
@@ -105,9 +114,10 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
           data-testid="question-bank-status-button"
           data-configured={String(ready)}
           data-loading={String(!isLoaded)}
-          // 加载中同样不可点，否则点了会展开一个还没读回配置的空面板。
-          // 早期写法是仅 disabled={ready}，导致「加载中可点开空面板」。
-          disabled={!isLoaded || ready}
+          // ⚠️ E9：只保留「加载中」不可点。**已配置时不再禁用** ——
+          //    原 disabled={!isLoaded || ready} 会让配好的用户再也进不去面板改配置
+          //    （用户实测反馈「题库配置后没有修改按钮」）。
+          disabled={!isLoaded}
           onClick={() => setExpanded((v) => !v)}
           className="shrink-0"
         >
@@ -121,6 +131,10 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
             <>
               <Check size={14} className="mr-1" aria-hidden="true" />
               {t('settings:questionBank.configured', '已配置')}
+              {/* 提示可点开修改（E9 新增） */}
+              <span className="ml-1 text-muted-foreground">
+                {t('settings:questionBank.configuredHint', '· 点击修改')}
+              </span>
             </>
           ) : (
             t('settings:questionBank.goConfigure', '去配置')
@@ -250,6 +264,61 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
                   )}
                 </DsButton>
               </div>
+
+              {/*
+                清除配置（E9 新增，用户要求「再加一个清除配置按钮」）。
+                二次确认：清掉的是加密存储里的 accessKey，误触后只能重填。
+                按钮只在**后端确实有配置**时才出现，避免空配置时给一个无意义的按钮。
+              */}
+              {ready && (
+                <div className="pt-1">
+                  {confirmClear ? (
+                    <div
+                      data-testid="question-bank-clear-confirm"
+                      className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-2"
+                    >
+                      <span className="text-xs text-destructive">
+                        {t(
+                          'settings:questionBank.clearConfirm',
+                          '清除后需重新填写凭据，确定？',
+                        )}
+                      </span>
+                      <DsButton
+                        variant="destructive"
+                        size="sm"
+                        data-testid="question-bank-clear-ok"
+                        disabled={isSaving}
+                        onClick={() => {
+                          setConfirmClear(false);
+                          void clear();
+                        }}
+                      >
+                        {t('settings:questionBank.clearOk', '确定清除')}
+                      </DsButton>
+                      <DsButton
+                        variant="ghost"
+                        size="sm"
+                        data-testid="question-bank-clear-cancel"
+                        onClick={() => setConfirmClear(false)}
+                      >
+                        {t('settings:questionBank.clearCancel', '取消')}
+                      </DsButton>
+                    </div>
+                  ) : (
+                    <DsButton
+                      variant="ghost"
+                      size="sm"
+                      data-testid="question-bank-clear"
+                      disabled={isSaving}
+                      onClick={() => setConfirmClear(true)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 size={14} className="mr-1" aria-hidden="true" />
+                      {t('settings:questionBank.clear', '清除配置')}
+                    </DsButton>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

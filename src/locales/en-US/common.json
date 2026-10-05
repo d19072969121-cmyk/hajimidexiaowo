@@ -4047,7 +4047,16 @@
     "emptyTitle": "No knowledge cards yet",
     "emptyDesc": "Jot down small facts as cards and look them up anytime",
     "new": "New card",
-    "openReview": "Go to spaced repetition review"
+    "openReview": "Go to spaced repetition review",
+    "newDialogTitle": "New knowledge card",
+    "newDialogDesc": "Knowledge cards are distilled by AI from your chats and mistakes. Go back home and ask AI to create one.",
+    "aiNew": "Create with AI",
+    "aiCreateHint": "You can ask AI to create knowledge cards on the home page",
+    "loadFailed": "Failed to load knowledge cards",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "noMatch": "No matching cards",
+    "uncategorized": "Uncategorized"
   },
   "weakPoints": {
     "title": "Weak Points",

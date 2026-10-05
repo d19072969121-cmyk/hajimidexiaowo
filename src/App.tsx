@@ -3357,6 +3357,16 @@ function App() {
                   <MobilePageScaffold>
                     <LazyKnowledgeCardsPage
                       onOpenFlashcards={() => setCurrentView('flashcards')}
+                      // E9（用户规格）：弹窗 A 点「AI 新建」→ 回首页 + 提示。
+                      // 提示文案是用户原话的转写，别改写成「已跳转」之类的空话。
+                      onAiCreate={() => {
+                        setCurrentView('chat-v2');
+                        showGlobalNotification(
+                          'info',
+                          t('common:knowledgeCards.aiCreateHint', '可以在主页让 AI 新建知识卡片'),
+                          t('common:knowledgeCards.title', '知识卡片'),
+                        );
+                      }}
                     />
                   </MobilePageScaffold>
                 </Suspense>
