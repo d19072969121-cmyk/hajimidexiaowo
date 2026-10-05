@@ -106,6 +106,23 @@ type SearchState =
   | { kind: 'loading' }
   | { kind: 'ok'; items: BankQuestion[]; billedCount: number }
   | { kind: 'empty' }
+  /**
+   * 还没法开搜（E9 修复问题 ④ 时拆出来的两个态）。
+   *
+   * ## 为什么必须与 `empty` 分开
+   * 原先三种完全不同的原因都收敛成 `kind: 'empty'`：
+   *   ① 错题本里**一条都没有** → 无从取题干
+   *   ② 有错题但**取不到题干**（OCR 未完成 / 空题）
+   *   ③ 真的搜了，但**上游 0 条结果**
+   * 用户看到的却都是「没找到同类题 · 这道错题可能没有对应的题库记录」——
+   * 在情形 ① 下这句话是**错的**：根本没有错题何来「这道错题」。
+   *
+   * 这正是「题库配了但刷题用不了」这类反馈的来源之一：
+   * 用户以为题库配置坏了，实际是错题本为空（或拍题会话没进错题本）。
+   * 拆开之后，每种原因给各自的文案与下一步动作。
+   */
+  | { kind: 'no-mistake' }
+  | { kind: 'no-question' }
   | { kind: 'quota'; registerUrl: string }
   | { kind: 'error'; message: string };
 
@@ -189,18 +206,19 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
   const startReviewVariants = useCallback(async () => {
     const { sessionId, question } = resolveSourceQuestion();
     setSourceQuestion(question);
+    // ⚠️ 三种「开不了搜」的原因必须分开报（原先全落到 empty，用户会误判成题库坏了）：
     if (!sessionId) {
-      setState({ kind: 'empty' });
+      setState({ kind: 'no-mistake' });
       return;
     }
     if (!question) {
-      // 有错题但取不到题干（OCR 未完成 / 空题）→ 明确的空态而非静默失败
-      setState({ kind: 'empty' });
+      setState({ kind: 'no-question' });
       return;
     }
     const keyword = toSearchKeyword(question);
     if (!keyword) {
-      setState({ kind: 'empty' });
+      // 题干是纯符号/空白 → 关键词为空。语义上等同「取不到可用题干」。
+      setState({ kind: 'no-question' });
       return;
     }
     await runSearch({ keyword });
@@ -323,6 +341,42 @@ export const PracticeSessionPage: React.FC<PracticeSessionPageProps> = ({
               {mode === 'review-variants'
                 ? t('practiceSession.emptyHintVariants', '这道错题可能没有对应的题库记录。可以试试「自己定类型」按知识点抽题。')
                 : t('practiceSession.emptyHintScope', '换个范围试试（如换个学科或年级）。')}
+            </div>
+          </div>
+        )}
+
+        {/*
+          错题本里一条都没有（E9：与「搜到 0 条」严格区分）。
+          这是问题 ④「配了题库却用不了」最常见的真实原因 ——
+          用户以为题库坏了，其实是还没有错题（或拍题会话没进错题本）。
+        */}
+        {state.kind === 'no-mistake' && (
+          <div className="py-8 text-center" data-testid="practice-session-no-mistake">
+            <Books size={18} className="mx-auto text-muted-foreground" aria-hidden="true" />
+            <div className="mt-1 text-sm text-foreground">
+              {t('practiceSession.noMistakeTitle', '还没有错题')}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {t(
+                'practiceSession.noMistakeHint',
+                '「温故新知」是拿你的错题去题库找同类题，所以需要先有一道错题。去拍一道题，或在「自己定类型」里直接按知识点抽题。',
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 有错题但取不到题干（OCR 未完成 / 题干为空）—— 提示回错题本看看 */}
+        {state.kind === 'no-question' && (
+          <div className="py-8 text-center" data-testid="practice-session-no-question">
+            <Books size={18} className="mx-auto text-muted-foreground" aria-hidden="true" />
+            <div className="mt-1 text-sm text-foreground">
+              {t('practiceSession.noQuestionTitle', '这道错题没有可用的题干')}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {t(
+                'practiceSession.noQuestionHint',
+                '可能是图片还没识别完，或这道题没有文字题干。回到错题本换一道有文字的题试试。',
+              )}
             </div>
           </div>
         )}
