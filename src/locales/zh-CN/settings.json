@@ -3095,6 +3095,29 @@
     "fillSandbox": "填入沙箱地址",
     "viewDocs": "查看接口文档",
     "save": "保存",
-    "loading": "读取中…"
+    "loading": "读取中…",
+    "probe": {
+      "button": "自检",
+      "hint": "真打一次题库接口，把链路断点摊开（会消耗少量试用额度）",
+      "ok": "链路通",
+      "fail": "链路不通",
+      "at": "探测时间",
+      "stepReady": "前端就绪判据",
+      "stepProvider": "来源",
+      "stepApi": "后端真实请求",
+      "yes": "通过",
+      "no": "未通过",
+      "code": "上游错误码",
+      "register": "可注册获取正式额度",
+      "emptyBody": "上游返回空响应（可能是网络或地址错误）",
+      "unknownError": "未知错误",
+      "diagnosisNotReady": "诊断：前端认为配置未就绪 —— 请检查来源是否选中、必填项是否填齐，然后点「保存」。",
+      "diagnosisReadyButFailed": "诊断：前端认为已就绪但请求失败 —— 断点在后端或网络。请把上面「②」的原始报错发我。"
+    },
+    "configuredHint": "· 点击修改",
+    "clear": "清除配置",
+    "clearConfirm": "清除后需重新填写凭据，确定？",
+    "clearOk": "确定清除",
+    "clearCancel": "取消"
   }
 }

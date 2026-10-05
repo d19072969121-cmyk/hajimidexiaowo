@@ -21,7 +21,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Check, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { Check, ExternalLink, Loader2, Stethoscope, Trash2 } from 'lucide-react';
 
 import { DsButton } from '@/components/ui/DsButton';
 import { cn } from '@/utils/cn';
@@ -34,6 +34,8 @@ import {
   type QuestionBankProviderId,
 } from '@/features/practice/questionBank/config';
 import { useQuestionBankConfig } from '@/features/practice/questionBank/useQuestionBankConfig';
+import { fetchQuestionBankQuota, extractErrorCode, extractRegisterUrl, DEFAULT_REGISTER_URL } from '@/features/practice/questionBank/bankClient';
+import { getErrorMessage } from '@/utils/errorUtils';
 
 export interface QuestionBankApiSectionProps {
   className?: string;
@@ -57,6 +59,7 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
   /** 「清除配置」的二次确认（E9）——清掉的是加密存储的凭据，必须防误触 */
   const [confirmClear, setConfirmClear] = useState(false);
 
+  // 就绪判据与来源元信息：必须声明在 handleProbe **之前**（它会读 ready）。
   const ready = useMemo(() => isQuestionBankReady(config), [config]);
   const activeMeta = useMemo(
     () => QUESTION_BANK_PROVIDERS.find((p) => p.id === config.provider) ?? null,
@@ -65,6 +68,69 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
   const activeCredentials = config.provider
     ? (config.credentials[config.provider] ?? {})
     : {};
+
+  /**
+   * 题库自检（E9 新增）。
+   *
+   * ## 为什么必须做这个按钮
+   * 用户报告「保存了但刷题用不了」，静态核对**每一环都是通的**
+   * （字段名/保存命令/加密通道/后端解析/真实 API 全部验过），
+   * 但真机上就是不通 —— 说明断点在**运行期**，读代码找不出来。
+   *
+   * 而抓真机日志成本很高（要连线、要过滤小米系统进程的噪声）。
+   * 所以把「链路探测」做进 App：点一下，依次走完
+   *   ① 前端配置就绪判据 → ② 后端凭据解析 + 真实打一次 API
+   * 并把每一步的结果用人话摊开。断在哪一步，一眼可见。
+   *
+   * ⚠️ 探测本身会**消费匿名试用额度**（真实请求上游）——
+   *    所以文案里明确说了，不隐瞒代价。
+   */
+  const [probe, setProbe] = useState<null | {
+    at: string;
+    ready: boolean;
+    provider: string;
+    ok: boolean;
+    detail: string;
+    code?: string | null;
+    registerUrl?: string | null;
+  }>(null);
+  const [isProbing, setIsProbing] = useState(false);
+
+  const handleProbe = useCallback(async () => {
+    setIsProbing(true);
+    setProbe(null);
+    const at = new Date().toLocaleTimeString();
+    try {
+      // ② 真实打一次上游（后端会自行解析 License / 走匿名试用）
+      const quota = await fetchQuestionBankQuota();
+      setProbe({
+        at,
+        ready,
+        provider: config.provider ?? '(未选择)',
+        ok: true,
+        detail: quota
+          ? `已用 ${quota.used ?? '?'} / 上限 ${quota.questionLimit ?? '?'}，剩余 ${quota.remaining ?? '?'}${quota.usedTrial ? '（匿名试用通道）' : '（License 通道）'}`
+          : t('settings:questionBank.probe.emptyBody', '上游返回空响应（可能是网络或地址错误）'),
+      });
+    } catch (err) {
+      // 失败也要把「后端到底报了什么」原样摊开 —— 这正是用户缺的信息
+      const code = extractErrorCode(err);
+      // extractRegisterUrl **总有返回值**（兜底 DEFAULT_REGISTER_URL），
+      // 故只在它给出「非默认」地址时才展示 —— 否则每次都贴一条默认链接，是噪声。
+      const registerUrl = extractRegisterUrl(err);
+      setProbe({
+        at,
+        ready,
+        provider: config.provider ?? '(未选择)',
+        ok: false,
+        detail: getErrorMessage(err) || t('settings:questionBank.probe.unknownError', '未知错误'),
+        code,
+        registerUrl: registerUrl && registerUrl !== DEFAULT_REGISTER_URL ? registerUrl : null,
+      });
+    } finally {
+      setIsProbing(false);
+    }
+  }, [ready, config.provider, t]);
 
   const handleSelectProvider = useCallback(
     (id: QuestionBankProviderId) => {
@@ -330,6 +396,105 @@ export const QuestionBankApiSection: React.FC<QuestionBankApiSectionProps> = ({ 
           className="mt-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs text-destructive"
         >
           {error}
+        </div>
+      )}
+
+      {/*
+        自检入口。**始终可见**（即使未配置）——未配置时点它正是最有用的：
+        立刻暴露「前端判据说没配好」还是「后端说地址不对」。
+      */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+        <DsButton
+          variant="outline"
+          size="sm"
+          data-testid="question-bank-probe"
+          disabled={isProbing || isSaving}
+          onClick={() => void handleProbe()}
+        >
+          {isProbing ? (
+            <Loader2 size={14} className="mr-1 animate-spin" />
+          ) : (
+            <Stethoscope size={14} className="mr-1" aria-hidden="true" />
+          )}
+          {t('settings:questionBank.probe.button', '自检')}
+        </DsButton>
+        <span className="text-xs text-muted-foreground">
+          {t(
+            'settings:questionBank.probe.hint',
+            '真打一次题库接口，把链路断点摊开（会消耗少量试用额度）',
+          )}
+        </span>
+      </div>
+
+      {probe && (
+        <div
+          data-testid="question-bank-probe-result"
+          data-ok={String(probe.ok)}
+          className={cn(
+            'mt-2 rounded-lg border px-3 py-2 text-xs',
+            probe.ok
+              ? 'border-emerald-500/40 bg-emerald-500/5 text-foreground'
+              : 'border-destructive/40 bg-destructive/5 text-destructive',
+          )}
+        >
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="font-medium">
+              {probe.ok
+                ? t('settings:questionBank.probe.ok', '链路通')
+                : t('settings:questionBank.probe.fail', '链路不通')}
+            </span>
+            <span className="text-muted-foreground">
+              {t('settings:questionBank.probe.at', '探测时间')} {probe.at}
+            </span>
+          </div>
+          <div className="space-y-0.5">
+            <div>
+              ① {t('settings:questionBank.probe.stepReady', '前端就绪判据')}：
+              <b>{probe.ready ? t('settings:questionBank.probe.yes', '通过') : t('settings:questionBank.probe.no', '未通过')}</b>
+              {' · '}
+              {t('settings:questionBank.probe.stepProvider', '来源')}: {probe.provider}
+            </div>
+            <div>
+              ② {t('settings:questionBank.probe.stepApi', '后端真实请求')}：
+              <b>{probe.ok ? t('settings:questionBank.probe.yes', '通过') : t('settings:questionBank.probe.no', '失败')}</b>
+              {' — '}
+              {probe.detail}
+            </div>
+            {probe.code && (
+              <div>
+                {t('settings:questionBank.probe.code', '上游错误码')}: <code>{probe.code}</code>
+              </div>
+            )}
+            {probe.registerUrl && (
+              <div>
+                {t('settings:questionBank.probe.register', '可注册获取正式额度')}:{' '}
+                <a
+                  href={probe.registerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  {probe.registerUrl}
+                </a>
+              </div>
+            )}
+            {!probe.ok && !probe.ready && (
+              <div className="mt-1">
+                {t(
+                  'settings:questionBank.probe.diagnosisNotReady',
+                  '诊断：前端认为配置未就绪 —— 请检查来源是否选中、必填项是否填齐，然后点「保存」。',
+                )}
+              </div>
+            )}
+            {!probe.ok && probe.ready && (
+              <div className="mt-1">
+                {t(
+                  'settings:questionBank.probe.diagnosisReadyButFailed',
+                  '诊断：前端认为已就绪但请求失败 —— 断点在后端或网络。请把上面「②」的原始报错发我。',
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>

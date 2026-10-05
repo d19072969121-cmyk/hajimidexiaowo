@@ -3095,6 +3095,29 @@
     "fillSandbox": "Fill sandbox URL",
     "viewDocs": "View API docs",
     "save": "Save",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "probe": {
+      "button": "Self-check",
+      "hint": "Makes one real request and shows where the chain breaks (uses a little trial quota)",
+      "ok": "Chain OK",
+      "fail": "Chain broken",
+      "at": "Probed at",
+      "stepReady": "Frontend readiness",
+      "stepProvider": "Provider",
+      "stepApi": "Backend real request",
+      "yes": "pass",
+      "no": "fail",
+      "code": "Upstream error code",
+      "register": "Register for full quota",
+      "emptyBody": "Upstream returned an empty response (network or wrong URL)",
+      "unknownError": "Unknown error",
+      "diagnosisNotReady": "Diagnosis: the frontend considers the config not ready — check that a provider is selected and required fields are filled, then hit Save.",
+      "diagnosisReadyButFailed": "Diagnosis: the frontend says ready but the request failed — the break is backend or network. Send me the raw error from step 2."
+    },
+    "configuredHint": "· tap to edit",
+    "clear": "Clear config",
+    "clearConfirm": "You'll need to re-enter credentials. Continue?",
+    "clearOk": "Clear",
+    "clearCancel": "Cancel"
   }
 }
