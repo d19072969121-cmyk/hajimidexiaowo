@@ -1067,6 +1067,15 @@ pub const BUILTIN_MODELS: &[BuiltinModel] = &[
     // 这里用最稳定的别名 `openai`（上游换底层模型时别名不受影响）。
     //
     // `temperature` 取 1.0：该后端是推理模型，采样参数偏离默认值易触发上游 400。
+    //
+    // ⚠️ `max_output_tokens` 必须**远小于** `context_window`（E11 实测教训）：
+    //    该 vendor 没有显式 context_window，运行时按 32768 兜底；
+    //    若这里的输出上限也取 32768，则 `窗口 - 输出 == 0`，
+    //    会被预算检查当成硬错误中止整轮对话：
+    //      "model context window leaves no usable input budget"
+    //    （用户实测「首页对话流式中断」就是这个）。
+    //    取 8192 留出充裕输入空间；同时已在 `effective_request_input_limit`
+    //    加了通用兜底，防止其它模型/用户自建配置再踩同一坑。
     BuiltinModel {
         id: "builtin-pollinations-openai",
         vendor_id: "builtin-pollinations",
@@ -1075,7 +1084,7 @@ pub const BUILTIN_MODELS: &[BuiltinModel] = &[
         is_multimodal: false,
         is_reasoning: true,
         supports_tools: true,
-        max_output_tokens: 32768,
+        max_output_tokens: 8_192,
         temperature: 1.0,
     },
 ];

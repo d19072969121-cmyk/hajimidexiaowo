@@ -78,7 +78,30 @@ fn effective_request_input_limit(
         .filter(|limit| *limit > 0)
         .map(|limit| requested.min(limit))
         .unwrap_or(requested);
-    let provider_limit = Some(window.saturating_sub(max_output) as usize);
+
+    // ⚠️ E11 修复：`max_output >= window` 会让 `window - max_output` 变成 0，
+    // 而调用方把「输入预算为 0」当成**硬错误**直接中止整轮对话：
+    //   "model context window leaves no usable input budget"
+    //
+    // ## 实测触发路径（用户报「首页对话流式中断」）
+    // 免 Key 通道（Pollinations）走的是 `BuiltinModel::to_model_profile()` 的
+    // **通用分支**，而该分支除 DeepSeek 外一律 `context_window: None`
+    // → 落到这里的 `unwrap_or(32_768)`。
+    // 给该模型配的 `max_output_tokens` 恰好是 32768 →
+    // `32768.saturating_sub(32768) == 0` → 报错。
+    //
+    // ## 为什么在**这里**修而不是改那条模型的配置
+    // 「输出上限 ≥ 上下文窗口」是任何模型（含用户自建的自定义供应商）
+    // 都可能出现的配置组合。在这里兜底，一处修复覆盖全部来源；
+    // 只改配置值等于把同类问题留给下一个模型。
+    //
+    // ## 兜底策略
+    // 至少保留 `MIN_INPUT_BUDGET_TOKENS` 的输入空间（也可视为对
+    // 「窗口小于输出上限」这种矛盾配置的温和纠正，而不是让对话直接失败）。
+    const MIN_INPUT_BUDGET_TOKENS: usize = 2_048;
+    let provider_limit = Some(
+        (window.saturating_sub(max_output) as usize).max(MIN_INPUT_BUDGET_TOKENS),
+    );
     match (override_limit, provider_limit) {
         (Some(override_limit), Some(provider_limit)) => Some(override_limit.min(provider_limit)),
         (Some(limit), None) | (None, Some(limit)) => Some(limit),
@@ -1124,6 +1147,62 @@ mod tests {
     use std::convert::Infallible;
     use std::sync::Arc;
     use tempfile::TempDir;
+
+    /// 回归（E11）：**输出上限 ≥ 上下文窗口**时，输入预算不能被算成 0。
+    ///
+    /// ## 用户实测症状
+    /// 首页对话「流式响应中断: 加载失败: LLM error:
+    /// model context window leaves no usable input budget」
+    ///
+    /// ## 触发路径
+    /// 免 Key 通道（Pollinations）走 `BuiltinModel::to_model_profile()` 的
+    /// 通用分支，该分支除 DeepSeek 外一律 `context_window: None`
+    /// → 落到 `unwrap_or(32_768)`；
+    /// 而当时给该模型配的 `max_output_tokens` 正好是 32768 →
+    /// `32768.saturating_sub(32768) == 0` → `enforce_request_input_budget`
+    /// 把「预算为 0」当硬错误中止整轮对话。
+    ///
+    /// ## 这条测试锁什么
+    /// 「输出上限 ≥ 窗口」这个**配置组合本身不该让对话直接失败**。
+    /// 无论它来自内置模型还是用户自建的自定义供应商。
+    #[test]
+    fn input_limit_never_collapses_to_zero_when_output_meets_window() {
+        let mut config = ApiConfig::default();
+        config.context_window = Some(32_768);
+        config.max_output_tokens = 32_768; // 与窗口相等 —— 曾经触发线上报错
+        let limit = effective_request_input_limit(&config, None)
+            .expect("provider_limit 恒为 Some");
+        assert!(
+            limit > 0,
+            "输出上限等于窗口时输入预算被算成 0，会直接中止对话：{limit}"
+        );
+
+        // 输出上限**超过**窗口（矛盾配置）同样不能崩
+        config.max_output_tokens = 65_536;
+        let limit = effective_request_input_limit(&config, None)
+            .expect("provider_limit 恒为 Some");
+        assert!(limit > 0, "输出上限超过窗口时输入预算被算成 0：{limit}");
+
+        // 正常配置不受影响：窗口 32768 - 输出 8192 = 24576
+        config.max_output_tokens = 8_192;
+        assert_eq!(
+            effective_request_input_limit(&config, None),
+            Some(24_576),
+        );
+    }
+
+    /// 回归：`max_tokens_limit` 比请求值更小时，按更小的那个算（既有行为）。
+    #[test]
+    fn input_limit_honours_provider_max_tokens_limit() {
+        let mut config = ApiConfig::default();
+        config.context_window = Some(65_536);
+        config.max_output_tokens = 32_768;
+        config.max_tokens_limit = Some(8_192);
+        assert_eq!(
+            effective_request_input_limit(&config, None),
+            Some(65_536 - 8_192),
+        );
+    }
 
     struct DropNotice(Option<tokio::sync::oneshot::Sender<()>>);
 
