@@ -99,6 +99,24 @@ fn effective_request_input_limit(
     // 至少保留 `MIN_INPUT_BUDGET_TOKENS` 的输入空间（也可视为对
     // 「窗口小于输出上限」这种矛盾配置的温和纠正，而不是让对话直接失败）。
     const MIN_INPUT_BUDGET_TOKENS: usize = 2_048;
+    // E13 实测（用户报「主页免 Key 模型流式中断」）：前端
+    // `deriveInputContextBudget` 在「推断窗口 ≤ 输出预留」的矛盾配置下会把
+    // 输入预算 clamp 到 MIN_INPUT_BUDGET(2048) 再作为 override 传下来，
+    // 而首页对话仅 system+工具就 ~7.2K tokens → 2048 预算必然卡死。
+    // 低于 MIN_USABLE_OVERRIDE 的 override 属「推导矛盾产生的荒谬值」，
+    // 语义上等于"不可用"——丢弃它并回退 provider_limit，让对话先跑通
+    // （与 E11 的 MIN_INPUT_BUDGET_TOKENS 托底同一哲学：温和纠正而非失败）。
+    const MIN_USABLE_OVERRIDE: usize = 4_096;
+    let override_limit = match override_limit {
+        Some(limit) if limit < MIN_USABLE_OVERRIDE => {
+            warn!(
+                "[input-budget] 丢弃过小的输入预算 override={}（< {MIN_USABLE_OVERRIDE}，推导矛盾值），回退 provider_limit",
+                limit
+            );
+            None
+        }
+        other => other,
+    };
     let provider_limit = Some(
         (window.saturating_sub(max_output) as usize).max(MIN_INPUT_BUDGET_TOKENS),
     );
