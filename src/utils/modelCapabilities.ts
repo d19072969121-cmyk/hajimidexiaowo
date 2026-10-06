@@ -357,7 +357,23 @@ const DEFAULT_FALLBACK_CONTEXT_WINDOW = 100_000;
 const MAX_CONTEXT_WINDOW_CAP = 2_000_000;
 const MIN_CONTEXT_WINDOW_CAP = 8_192;
 const MIN_OUTPUT_RESERVE = 1_024;
-const MIN_INPUT_BUDGET = 2_048;
+/**
+ * 输入预算下限（**推导路径**专用，不含用户显式配置）。
+ *
+ * ⚠️ E15：原为 2048，与后端 `MIN_INPUT_BUDGET_TOKENS` 同源的同一个错误。
+ * 首页单轮对话的固定开销（system + 工具定义 + 瞬态 `<request_context>`/
+ * `<skill_instructions>` 注入）实测约 7.2K，任何小于它的"下限"都会让
+ * 推导结果落进「必然超限」区间：后端 `enforce_request_input_budget`
+ * 立刻以 `context budget exceeded ... limit=2048` 中断整轮对话。
+ * 下限必须大于请求体的最小可用形态，故与后端对齐取 16384。
+ */
+const MIN_INPUT_BUDGET = 16_384;
+/**
+ * 用户**显式**配置输入预算时的保底值。
+ * 与推导路径的 `MIN_INPUT_BUDGET` 刻意分开：用户填 8192 是明确意图
+ * （窄窗口模型省 token），必须原样尊重，不得被前端放大成 16384。
+ */
+const MIN_USER_CONFIGURED_INPUT_BUDGET = 1_024;
 const DEFAULT_CONTEXT_HEADROOM_RATIO = 0.08;
 const DEFAULT_CONTEXT_HEADROOM_TOKENS = 1_024;
 
@@ -431,7 +447,9 @@ export function deriveInputContextBudget(options: InputContextBudgetOptions): nu
   } = options;
 
   if (typeof userContextLimit === 'number' && Number.isFinite(userContextLimit) && userContextLimit > 0) {
-    return Math.max(MIN_INPUT_BUDGET, Math.floor(userContextLimit));
+    // 用户**显式**配置的预算属明确意图，只做「不为 0/负数」的保底，
+    // 不套用推导路径的可用性下限（那会擅自放大用户的省 token 配置）。
+    return Math.max(MIN_USER_CONFIGURED_INPUT_BUDGET, Math.floor(userContextLimit));
   }
 
   const normalizedContextWindow = clampNumber(
