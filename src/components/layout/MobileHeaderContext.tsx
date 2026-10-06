@@ -106,6 +106,21 @@ export const MobileHeaderProvider: React.FC<{ children: ReactNode }> = ({ childr
   // 的陈旧回调（重挂载完成前的窗口期内可被点击）。由 useMobileHeader 卸载时调用。
   const clearConfig = useCallback((viewId: string) => {
     configCacheRef.current.delete(viewId);
+    // 若清掉的正是当前活跃视图，configState 仍指向刚被删除的陈旧对象。
+    // 此时只收敛实例绑定，保留 showMenu / onMenuClick 的「三杠」形态，
+    // 等重新挂载后的 setConfig 覆盖；否则会在重挂载窗口期闪没三杠。
+    if (activeViewRef.current === viewId) {
+      setConfigState((prev) => {
+        if (!prev.rightActions && !prev.titleNode) {
+          return prev;
+        }
+        return {
+          ...prev,
+          rightActions: undefined,
+          titleNode: undefined,
+        };
+      });
+    }
   }, []);
 
   // 设置活跃视图
@@ -115,9 +130,30 @@ export const MobileHeaderProvider: React.FC<{ children: ReactNode }> = ({ childr
       return;
     }
     activeViewRef.current = viewId;
-    // 应用该视图缓存的配置；没有缓存（懒加载组件还没加载）时先显示空配置，页面加载后会更新
-    const cachedConfig = configCacheRef.current.get(viewId) ?? defaultConfig;
-    setConfigState((prev) => (prev === cachedConfig ? prev : cachedConfig));
+    const cachedConfig = configCacheRef.current.get(viewId);
+    if (cachedConfig) {
+      setConfigState((prev) => (prev === cachedConfig ? prev : cachedConfig));
+      return;
+    }
+    // ★ 缓存未命中（懒加载组件尚未注册配置）时保持上一个视图的顶栏配置不动，
+    // 而不是回退到 defaultConfig：defaultConfig 的 showMenu=false /
+    // onMenuClick=undefined 会让左上角「三杠」在切视图瞬间消失，页面挂载后
+    // 再 setConfig 才恢复 —— 表现为「三杠闪一下才出现」。
+    // 新视图挂载后会通过 useMobileHeader 的 setConfig 覆盖，无需此处兜底。
+    // 仅做最小收敛：清掉与已卸载组件实例强绑定的 rightActions / titleNode
+    // （陈旧 ReactNode 与其闭包会滞留，且可能被点到）。
+    // 刻意保留 showMenu / onMenuClick：三杠按钮由它们决定存在性，窗口期内
+    // 顶栏必须维持与上一视图一致的按钮形态，否则仍会闪。
+    setConfigState((prev) => {
+      if (!prev.rightActions && !prev.titleNode) {
+        return prev;
+      }
+      return {
+        ...prev,
+        rightActions: undefined,
+        titleNode: undefined,
+      };
+    });
   }, []);
 
   const resetConfig = useCallback(() => {
