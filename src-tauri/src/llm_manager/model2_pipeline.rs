@@ -98,7 +98,18 @@ fn effective_request_input_limit(
     // ## 兜底策略
     // 至少保留 `MIN_INPUT_BUDGET_TOKENS` 的输入空间（也可视为对
     // 「窗口小于输出上限」这种矛盾配置的温和纠正，而不是让对话直接失败）。
-    const MIN_INPUT_BUDGET_TOKENS: usize = 2_048;
+    //
+    // ⚠️ E15 实测修正：该值原为 2048，但**首轮对话的固定开销就约 7.2K**
+    // （system 提示 + 全量工具定义 + 瞬态 `<request_context>` /
+    // `<skill_instructions>` 注入），2048 的托底等于「托了也没用」：
+    // `window - max_output` 归零后被托到 2048，紧接着
+    // `enforce_request_input_budget` 立刻因 7228 > 2048 卡死整轮对话
+    // （用户报「免 Key 模型还是不能用」，报错 limit=2048）。
+    // 托底值必须大于「请求体的最小可用形态」，否则它只是把一个错误
+    // （预算为 0）换成了另一个错误（预算小到永远超限）。
+    // 取 16384：高于实测固定开销，且仍远小于任何真实模型的上下文窗口，
+    // 不会让超大 payload 绕过后续的真实超限检查。
+    const MIN_INPUT_BUDGET_TOKENS: usize = 16_384;
     // E13 实测（用户报「主页免 Key 模型流式中断」）：前端
     // `deriveInputContextBudget` 在「推断窗口 ≤ 输出预留」的矛盾配置下会把
     // 输入预算 clamp 到 MIN_INPUT_BUDGET(2048) 再作为 override 传下来，
@@ -106,6 +117,15 @@ fn effective_request_input_limit(
     // 低于 MIN_USABLE_OVERRIDE 的 override 属「推导矛盾产生的荒谬值」，
     // 语义上等于"不可用"——丢弃它并回退 provider_limit，让对话先跑通
     // （与 E11 的 MIN_INPUT_BUDGET_TOKENS 托底同一哲学：温和纠正而非失败）。
+    //
+    // ⚠️ E15：此阈值**不随** MIN_INPUT_BUDGET_TOKENS 上调。
+    // 它的语义是「识别推导矛盾产生的荒谬值」（前端 clamp 出来的最小值），
+    // 而不是「剔除所有偏小的用户配置」——用户手动配 8192 输入预算
+    // （窄窗口模型省 token 的合理诉求）必须被尊重。
+    // 真正解决 4096~16383 这段"偏小但非荒谬"的区间，靠的是：
+    //   ① provider_limit 托底值本身够大（MIN_INPUT_BUDGET_TOKENS）；
+    //   ② `enforce_request_input_budget` 在裁无可裁时放行而非中止。
+    // 用一个过大的 override 阈值去拦，会连带误伤合法的手动配置。
     const MIN_USABLE_OVERRIDE: usize = 4_096;
     let override_limit = match override_limit {
         Some(limit) if limit < MIN_USABLE_OVERRIDE => {
@@ -493,6 +513,38 @@ fn trim_latest_turn_volatile_tail(
     }
 }
 
+/// 请求体中**不可裁剪部分**的 token 估算。
+///
+/// 「不可裁剪」= 被 `is_pinned_request_message` 判定为 pinned 的消息
+/// （system 提示、`<compacted_context>` / `<skill_instructions` /
+/// `<request_context>` 瞬态注入），加上请求体里的非 messages 字段
+/// （工具定义 `tools`、`tool_choice`、各 provider 的额外参数等）——
+/// 后者在裁剪中从不被改动，属于货真价实的固定开销。
+///
+/// 用途：区分「payload 过大」（裁剪能救）与「固定开销本身就超预算」
+/// （裁剪救不了，limit 是推导残值，应放行交 provider 定夺）。
+fn pinned_request_tokens(request_body: &Value, estimate: &impl Fn(&Value) -> usize) -> usize {
+    let mut pinned = Vec::new();
+    if let Some(messages) = request_body.get("messages").and_then(Value::as_array) {
+        for message in messages {
+            if is_pinned_request_message(message) {
+                pinned.push(message.clone());
+            }
+        }
+    }
+    // 非 messages 的顶层字段（tools 等）在裁剪流程中恒定不变，计入固定开销。
+    let mut fixed = serde_json::Map::new();
+    if let Some(object) = request_body.as_object() {
+        for (key, value) in object {
+            if key != "messages" {
+                fixed.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    let pinned_body = json!({ "messages": pinned, "fixed": Value::Object(fixed) });
+    estimate(&pinned_body)
+}
+
 fn enforce_request_input_budget(
     request_body: &mut Value,
     max_input_tokens: Option<usize>,
@@ -565,6 +617,46 @@ fn enforce_request_input_budget(
         stats.tokens_after = estimate(request_body);
     }
     if stats.tokens_after > max_input_tokens {
+        // ⚠️ E15 修复（用户报「免 Key 模型还是不能用」，报错 limit=2048）：
+        //
+        // 这里原本无条件把超预算当硬错误中止整轮对话。但存在一类**不可修复**
+        // 的超预算：请求体的固定开销（system 提示 + 工具定义 + 瞬态
+        // `<request_context>`/`<skill_instructions>` 注入）本身就已超过 limit。
+        //
+        // 实测路径：免 Key 通道没有显式 `context_window` → 运行时按 32768
+        // 兜底；若该模型配置的 `max_output_tokens` 与之相等或更大，
+        // `effective_request_input_limit` 的 `(window - max_output)` 被
+        // `MIN_INPUT_BUDGET_TOKENS(2048)` 托底 → limit=2048。
+        // 而首页单轮对话 system+工具就 ~7.2K：
+        //   · `removable_request_turns` 的 system / `<request_context>` /
+        //     `<skill_instructions>` 全被判为 pinned，唯一真实 user 又被
+        //     `ranges.len() <= 2` 早退挡住 → removed_messages=0；
+        //   · 尾裁找不到够长的可裁文本 → trimmed_tail_chars=0。
+        // 于是「裁无可裁」+「固定开销超限」，用户看到对话刚发就断流，
+        // 且换任何问法都必然复现。
+        //
+        // 判定：**固定开销（pinned 部分）单独就超过 limit** 时，超限并非
+        // payload 过大（那类问题裁剪至少能削掉一些），而是 limit 本身小于
+        // 请求体的最小形态 —— 此时 limit 是推导产物（`window - max_output`
+        // 被托底的残值），不代表模型真实能力。把一个推导残值当硬闸门掐死
+        // 对话是错的，应放行交由 provider 定夺（provider 真放不下会返回
+        // 它自己的 400，那才是可信的失败信号）。
+        //
+        // ⚠️ 判据必须精确到「pinned 部分自身超限」，不能用「没削下任何东西」
+        // 这种宽口径：图片请求（`image_url.url` 里的 base64）不属于
+        // `collect_trimmable_texts` 收集范围（它只收字符串 content 与
+        // 数组 part 的 `text` 字段），因此图片超限同样表现为
+        // removed=0/trimmed=0 —— 但那**是**真实超限，必须继续抛错。
+        // 既有测试 deepseek_v41_image_budget_is_scoped_to_official_vision_models
+        // 正是靠这个错误信号区分计费分支，宽口径会把它打穿。
+        let pinned_tokens = pinned_request_tokens(request_body, &estimate);
+        if pinned_tokens > max_input_tokens && stats.removed_messages == 0 {
+            warn!(
+                "[input-budget] 请求体固定开销({} tokens，pinned 部分)超过推导出的输入预算({})；判定为预算推导残值而非真实超限，放行交 provider 定夺",
+                pinned_tokens, max_input_tokens
+            );
+            return Ok(stats);
+        }
         return Err(routing::attach_llm_error_code(
             AppError::llm(format!(
                 "context budget exceeded after safe trimming: estimated_input_tokens={} limit={} removed_messages={} trimmed_tail_chars={}; reduce the current attachment/tool payload or choose a larger-context model",
@@ -1201,11 +1293,111 @@ mod tests {
             .expect("provider_limit 恒为 Some");
         assert!(limit > 0, "输出上限超过窗口时输入预算被算成 0：{limit}");
 
+        // ⚠️ E15 加固：只断言「> 0」不够。首轮对话固定开销实测约 7.2K
+        // （system + 工具定义 + 瞬态注入），托底值若小于它，对话仍会被
+        // `enforce_request_input_budget` 卡死 —— 用户报「免 Key 模型还是
+        // 不能用，limit=2048」正是这个漏网场景。这里锁住「托底值必须
+        // 大于首轮固定开销(7.2K)」这一实质要求。
+        const FIRST_TURN_FIXED_OVERHEAD_TOKENS: usize = 7_228; // 线上实测
+        assert!(
+            limit > FIRST_TURN_FIXED_OVERHEAD_TOKENS,
+            "输出上限≥窗口时的托底输入预算({limit})不大于首轮固定开销\
+             ({FIRST_TURN_FIXED_OVERHEAD_TOKENS})，首页对话仍会被卡死"
+        );
+
         // 正常配置不受影响：窗口 32768 - 输出 8192 = 24576
         config.max_output_tokens = 8_192;
         assert_eq!(
             effective_request_input_limit(&config, None),
             Some(24_576),
+        );
+    }
+
+    /// E15 回归：矛盾配置推导出的极小 override 必须被丢弃，
+    /// 且回退后的预算要大到能容纳首轮固定开销。
+    #[test]
+    fn tiny_derived_override_is_discarded_not_merely_non_zero() {
+        let mut config = ApiConfig::default();
+        config.context_window = Some(32_768);
+        // 与窗口相等 → provider_limit 走 MIN_INPUT_BUDGET_TOKENS 托底
+        config.max_output_tokens = 32_768;
+
+        // 前端在矛盾配置下会 clamp 出 2048 并作为 override 下发
+        let limit = effective_request_input_limit(&config, Some(2_048))
+            .expect("provider_limit 恒为 Some");
+
+        assert_ne!(limit, Some(2_048), "荒谬 override 未被丢弃");
+        assert!(
+            limit > 7_228,
+            "丢弃 override 后回退值仍不足以容纳首轮固定开销：{limit}"
+        );
+    }
+
+    /// E15 边界：用户**手动**配置的偏小 override 必须被尊重，
+    /// 不得用「首轮开销」为由擅自丢掉（那是扩大打击面，不是修 bug）。
+    #[test]
+    fn user_configured_small_override_is_still_honoured() {
+        let mut config = ApiConfig::default();
+        config.context_window = Some(200_000);
+        config.max_output_tokens = 8_192;
+
+        // 8192 > MIN_USABLE_OVERRIDE(4096) → 属用户意图，必须采纳
+        let limit = effective_request_input_limit(&config, Some(8_192));
+        assert_eq!(
+            limit,
+            Some(8_192),
+            "用户手动配置的 8192 输入预算被擅自丢弃"
+        );
+    }
+
+    /// E15 核心回归（用户报「免 Key 模型还是不能用」，报错 limit=2048）：
+    /// 当请求体的**固定开销本身**就超过 limit 时，不得中止整轮对话。
+    ///
+    /// 复现真实形态：免 Key 通道无 context_window → 32768 兜底，
+    /// max_output 与窗口相等 → (window - max_output) 归零 → 托底 →
+    /// 首页 system + 瞬态注入 + 工具定义约 7.2K > limit。
+    #[test]
+    fn fixed_overhead_exceeding_derived_budget_is_released_not_fatal() {
+        let config = ApiConfig::default();
+        // 构造首页最小对话形态：system + 瞬态 request_context + 真实 user
+        let long_system = "系统提示".repeat(1_500);
+        let mut request = json!({
+            "messages": [
+                { "role": "system", "content": long_system },
+                { "role": "user", "content": "<request_context>当前页面：对话首页</request_context>" },
+                { "role": "user", "content": "你好" }
+            ],
+            "tools": [{ "type": "function", "function": { "name": "search", "parameters": {} } }]
+        });
+
+        // limit=2048 即线上报错值：固定开销远大于它
+        let result = enforce_request_input_budget(&mut request, Some(2_048), &config);
+
+        assert!(
+            result.is_ok(),
+            "固定开销超预算时仍中止了整轮对话：{:?}",
+            result.err()
+        );
+    }
+
+    /// E15 反向边界：**真实**超限（payload 本身过大、固定开销不超）必须继续抛错。
+    /// 这是既有 deepseek_v41 图片测试依赖的错误信号，不得被打穿。
+    #[test]
+    fn genuine_payload_overflow_still_fails() {
+        let config = ApiConfig::default();
+        // 无 system / 无瞬态注入 → pinned 开销极小；
+        // 超限全部来自可裁剪的真实 user 内容之上的图片载荷
+        let big = "x".repeat(60_000);
+        let mut request = json!({
+            "messages": [
+                { "role": "user", "content": big }
+            ]
+        });
+
+        let result = enforce_request_input_budget(&mut request, Some(2_000), &config);
+        assert!(
+            result.is_err(),
+            "真实超限被误放行，context window 保护失效"
         );
     }
 
